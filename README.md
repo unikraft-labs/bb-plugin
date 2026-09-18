@@ -38,6 +38,7 @@ Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
 | Mode | `managed` | `managed` creates the bastion; `external` uses yours. |
 | Unikraft Cloud token | — | Required in managed mode. Stored as a secret. |
 | Metro | — | The metro the bastion and its sandboxes run in, e.g. `fra`. |
+| Organisation | from the token | The organisation console links point at. Managed mode reads it from the Unikraft Cloud token; set it by hand in external mode, or when the token names another organisation. |
 | Bastion URL | — | Filled in by managed mode; required in external mode. |
 | Bastion token | generated | Bearer token for the bastion's control API. Secret. |
 | Bastion image | `index.unikraft.io/unikraft/bb-bastion:latest` | |
@@ -83,8 +84,10 @@ size chip next to the row starts on the configured defaults and overrides
 vCPUs and memory for that thread only.
 
 The thread's machine is named after its sandbox instance, and the thread
-header carries a pill with the sandbox's state. `bb unikraft-cloud sandbox
-<thread-id>` prints the same state on the command line.
+header reads `Unikraft Cloud (<sandbox>)` with a pill carrying the sandbox's
+state; the sandbox name links to the instance in the Unikraft Cloud console
+once the organisation is known. `bb unikraft-cloud sandbox <thread-id>` prints
+the same state and link on the command line.
 
 bb owns the sandbox from there: archiving or deleting the thread deletes its
 sandbox. Stopping the bastion leaves sandboxes in standby; **Delete all
