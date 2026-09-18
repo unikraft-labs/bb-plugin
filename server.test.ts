@@ -59,6 +59,10 @@ async function startBastion(): Promise<Bastion> {
       response.end(envelope(SANDBOX));
       return;
     }
+    if (path === "/v1/sandboxes/thread-1" && request.method === "GET") {
+      response.end(envelope(SANDBOX));
+      return;
+    }
     if (path === "/v1/sandboxes" && request.method === "DELETE") {
       response.end(envelope({ deleted: ["thread-1"] }));
       return;
@@ -154,6 +158,7 @@ describe("plugin registration", () => {
       "bastion.status",
       "bastion.stop",
       "sandboxes.deleteAll",
+      "sandboxes.get",
       "sandboxes.list",
       "settings.read",
       "settings.write",
@@ -233,6 +238,24 @@ describe("sandbox rpc", () => {
         createdAt: "2026-01-01T00:00:00Z",
       },
     ]);
+  });
+
+  it("describes one thread's sandbox", async () => {
+    const { harness } = await load();
+    const result = (await harness.behavior.callRpc("sandboxes.get", {
+      threadId: "thread-1",
+    })) as { sandbox: SandboxView | null };
+    expect(result.sandbox).toMatchObject({
+      name: "bbx-thread-1",
+      state: "running",
+    });
+  });
+
+  it("reports no sandbox for an unknown thread", async () => {
+    const { harness } = await load();
+    expect(
+      await harness.behavior.callRpc("sandboxes.get", { threadId: "thread-2" }),
+    ).toEqual({ sandbox: null });
   });
 
   it("deletes every sandbox", async () => {

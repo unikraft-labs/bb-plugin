@@ -13,7 +13,7 @@ import {
   type ResolvedSettings,
 } from "./configuration";
 import { registerEnvironment } from "./providers/environment";
-import { registerMachine } from "./providers/machine";
+import { isNotFound, registerMachine } from "./providers/machine";
 import { registerServerAccess } from "./providers/server-access";
 import { describeError, type ProviderStatus } from "./providers/status";
 import { runTunnel } from "./tunnel/mux";
@@ -116,6 +116,10 @@ export const rpcContract = defineRpcContract({
   "sandboxes.list": {
     input: z.null(),
     output: z.object({ sandboxes: z.array(sandboxSchema) }),
+  },
+  "sandboxes.get": {
+    input: z.object({ threadId: z.string() }),
+    output: z.object({ sandbox: sandboxSchema.nullable() }),
   },
   "sandboxes.deleteAll": {
     input: z.null(),
@@ -384,6 +388,16 @@ export default async function plugin(bb: BbPluginApi) {
     return data.sandboxes.map(toSandboxView);
   }
 
+  async function readSandbox(threadId: string): Promise<SandboxView | null> {
+    try {
+      const data = unwrap(await client().sandboxes.getSandbox(threadId));
+      return toSandboxView(data);
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+  }
+
   async function deleteAllSandboxes(): Promise<string[]> {
     const data = unwrap(await client().sandboxes.deleteAllSandboxes());
     publish();
@@ -455,6 +469,9 @@ export default async function plugin(bb: BbPluginApi) {
     "bastion.start": () => start(),
     "bastion.stop": () => stop(),
     "sandboxes.list": async () => ({ sandboxes: await listSandboxes() }),
+    "sandboxes.get": async ({ threadId }) => ({
+      sandbox: await readSandbox(threadId),
+    }),
     "sandboxes.deleteAll": async () => ({ deleted: await deleteAllSandboxes() }),
     "template.warm": ({ force }) => warmTemplate(force ?? false),
     "settings.read": () => readSettings(),
