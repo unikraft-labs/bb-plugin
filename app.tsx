@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FloatingInput } from "@/components/ui/floating-input";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import {
@@ -634,9 +635,29 @@ function parseSize(value: unknown): { vcpus: string; memoryMb: string } {
 }
 
 function SandboxSizeInputs({ value, onChange }: PluginMachineProviderInputsProps) {
+  const rpc = useRpc<typeof rpcContract>();
   const initial = parseSize(value);
   const [vcpus, setVcpus] = useState(initial.vcpus);
   const [memoryMb, setMemoryMb] = useState(initial.memoryMb);
+
+  useEffect(() => {
+    let live = true;
+    rpc.call("settings.read").then(
+      (view) => {
+        if (!live) return;
+        setVcpus((current) =>
+          current === "" ? String(view.sandboxVcpus) : current,
+        );
+        setMemoryMb((current) =>
+          current === "" ? String(view.sandboxMemoryMb) : current,
+        );
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [rpc]);
 
   const submit = (nextVcpus: string, nextMemory: string) => {
     const size: Record<string, number> = {};
@@ -663,27 +684,27 @@ function SandboxSizeInputs({ value, onChange }: PluginMachineProviderInputsProps
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Input
-        className="h-8 w-20"
+    <div className="flex items-center gap-2 pt-1.5">
+      <FloatingInput
+        label="vCPU"
+        containerClassName="w-20"
+        className="h-8"
         type="number"
         min={1}
         max={16}
-        placeholder="vCPU"
-        aria-label="vCPUs for this sandbox"
         value={vcpus}
         onChange={(event) => {
           setVcpus(event.target.value);
           submit(event.target.value, memoryMb);
         }}
       />
-      <Input
-        className="h-8 w-28"
+      <FloatingInput
+        label="Memory (MiB)"
+        containerClassName="w-32"
+        className="h-8"
         type="number"
         min={256}
         max={65536}
-        placeholder="MiB"
-        aria-label="Memory for this sandbox"
         value={memoryMb}
         onChange={(event) => {
           setMemoryMb(event.target.value);
