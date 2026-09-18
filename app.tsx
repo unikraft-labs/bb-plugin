@@ -26,6 +26,11 @@ import { FloatingInput } from "@/components/ui/floating-input";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,6 +47,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { decorateTree } from "@/lib/machine-line";
+import {
+  parseSandboxOptions,
+  submissionFor,
+  type SandboxOptionDrafts,
+} from "@/lib/sandbox-options";
 import {
   nextInterval,
   SANDBOX_POLL_MS,
@@ -647,34 +657,16 @@ function UnikraftCloudSettings() {
   );
 }
 
-function parseSize(value: unknown): { vcpus: string; memoryMb: string } {
-  if (typeof value !== "object" || value === null) {
-    return { vcpus: "", memoryMb: "" };
-  }
-  const record = value as Record<string, unknown>;
-  return {
-    vcpus: typeof record.vcpus === "number" ? String(record.vcpus) : "",
-    memoryMb: typeof record.memoryMb === "number" ? String(record.memoryMb) : "",
-  };
-}
-
-function SandboxSizeInputs({ value, onChange }: PluginMachineProviderInputsProps) {
+function SandboxOptions({ value, onChange }: PluginMachineProviderInputsProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const initial = parseSize(value);
-  const [vcpus, setVcpus] = useState(initial.vcpus);
-  const [memoryMb, setMemoryMb] = useState(initial.memoryMb);
+  const [options, setOptions] = useState(() => parseSandboxOptions(value));
+  const [defaults, setDefaults] = useState<SettingsView | null>(null);
 
   useEffect(() => {
     let live = true;
     rpc.call("settings.read").then(
       (view) => {
-        if (!live) return;
-        setVcpus((current) =>
-          current === "" ? String(view.sandboxVcpus) : current,
-        );
-        setMemoryMb((current) =>
-          current === "" ? String(view.sandboxMemoryMb) : current,
-        );
+        if (live) setDefaults(view);
       },
       () => {},
     );
@@ -683,59 +675,135 @@ function SandboxSizeInputs({ value, onChange }: PluginMachineProviderInputsProps
     };
   }, [rpc]);
 
-  const submit = (nextVcpus: string, nextMemory: string) => {
-    const size: Record<string, number> = {};
-    if (nextVcpus.trim() !== "") {
-      const parsed = Number(nextVcpus);
-      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 16) {
-        onChange({ status: "blocked", reason: "vCPUs must be 1 to 16." });
-        return;
-      }
-      size.vcpus = parsed;
-    }
-    if (nextMemory.trim() !== "") {
-      const parsed = Number(nextMemory);
-      if (!Number.isInteger(parsed) || parsed < 256 || parsed > 65_536) {
-        onChange({
-          status: "blocked",
-          reason: "Memory must be 256 to 65536 MiB.",
-        });
-        return;
-      }
-      size.memoryMb = parsed;
-    }
-    onChange({ status: "ready", value: Object.keys(size).length === 0 ? null : size });
+  const edit = (next: SandboxOptionDrafts) => {
+    setOptions(next);
+    onChange(submissionFor(next));
   };
 
+  const set = (key: "vcpus" | "memoryMb" | "image", next: string) => {
+    edit({ ...options, [key]: next });
+  };
+
+  const setPort = (index: number, next: string) => {
+    edit({
+      ...options,
+      ports: options.ports.map((port, at) => (at === index ? next : port)),
+    });
+  };
+
+  const addPort = () => edit({ ...options, ports: [...options.ports, ""] });
+
+  const removePort = (index: number) => {
+    edit({ ...options, ports: options.ports.filter((_, at) => at !== index) });
+  };
+
+  const exposed = options.ports.filter((port) => port.trim() !== "").length;
+
   return (
-    <div className="flex items-center gap-2 pt-1.5">
-      <FloatingInput
-        label="vCPU"
-        containerClassName="w-20"
-        className="h-8"
-        type="number"
-        min={1}
-        max={16}
-        value={vcpus}
-        onChange={(event) => {
-          setVcpus(event.target.value);
-          submit(event.target.value, memoryMb);
-        }}
-      />
-      <FloatingInput
-        label="Memory (MiB)"
-        containerClassName="w-32"
-        className="h-8"
-        type="number"
-        min={256}
-        max={65536}
-        value={memoryMb}
-        onChange={(event) => {
-          setMemoryMb(event.target.value);
-          submit(vcpus, event.target.value);
-        }}
-      />
-    </div>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative size-8"
+          aria-label="Sandbox options"
+        >
+          <Icon name="Settings" className="size-4" />
+          {exposed === 0 ? null : (
+            <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-foreground text-[10px] leading-none text-background">
+              {exposed}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 space-y-3">
+        <FloatingInput
+          label="Image"
+          className="h-8"
+          placeholder={defaults?.sandboxImage ?? ""}
+          value={options.image}
+          onChange={(event) => set("image", event.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Another image skips the warm template, so the sandbox takes longer to
+          start.
+        </p>
+        <div className="flex items-center gap-2">
+          <FloatingInput
+            label="vCPU"
+            containerClassName="w-20"
+            className="h-8"
+            type="number"
+            min={1}
+            max={16}
+            placeholder={
+              defaults === null ? "" : String(defaults.sandboxVcpus)
+            }
+            value={options.vcpus}
+            onChange={(event) => set("vcpus", event.target.value)}
+          />
+          <FloatingInput
+            label="Memory (MiB)"
+            containerClassName="w-32"
+            className="h-8"
+            type="number"
+            min={256}
+            max={65536}
+            placeholder={
+              defaults === null ? "" : String(defaults.sandboxMemoryMb)
+            }
+            value={options.memoryMb}
+            onChange={(event) => set("memoryMb", event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-foreground">
+              Exposed ports
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label="Expose another port"
+              onClick={addPort}
+            >
+              <Icon name="Plus" className="size-4" />
+            </Button>
+          </div>
+          {options.ports.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              The sandbox is reachable from the Internet on every port you add,
+              at an address it gets when it starts.
+            </p>
+          ) : (
+            options.ports.map((port, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  className="h-8 w-24"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  placeholder="8080"
+                  aria-label={`Port ${index + 1}`}
+                  value={port}
+                  onChange={(event) => setPort(index, event.target.value)}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  aria-label={`Remove port ${index + 1}`}
+                  onClick={() => removePort(index)}
+                >
+                  <Icon name="X" className="size-4" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -876,7 +944,7 @@ export default definePluginApp((app) => {
   });
   app.slots.experimental_machineProviderInputs({
     machineProviderId: MACHINE_PROVIDER_ID,
-    component: SandboxSizeInputs,
+    component: SandboxOptions,
   });
   app.slots.experimental_threadHeaderAction({
     id: "sandbox-state",
