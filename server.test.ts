@@ -244,18 +244,46 @@ describe("sandbox rpc", () => {
     const { harness } = await load();
     const result = (await harness.behavior.callRpc("sandboxes.get", {
       threadId: "thread-1",
-    })) as { sandbox: SandboxView | null };
+    })) as { sandbox: SandboxView | null; consoleUrl: string | null };
     expect(result.sandbox).toMatchObject({
       name: "bbx-thread-1",
       state: "running",
     });
+    expect(result.consoleUrl).toBeNull();
+  });
+
+  it("links the sandbox to the console once the organisation is known", async () => {
+    const { harness } = await load({
+      ...externalSettings(bastion.url),
+      ukcOrg: "acme",
+    });
+    const result = (await harness.behavior.callRpc("sandboxes.get", {
+      threadId: "thread-1",
+    })) as { consoleUrl: string | null };
+    expect(result.consoleUrl).toBe(
+      "https://console.unikraft.cloud/org/acme/instances/fra/bbx-thread-1",
+    );
+  });
+
+  it("reads the organisation out of the cloud token", async () => {
+    const { harness } = await load({
+      ...externalSettings(bastion.url),
+      ukcToken: Buffer.from("robot$acme.users.kraftcloud:secret").toString(
+        "base64",
+      ),
+    });
+    const status = (await harness.behavior.callRpc(
+      "bastion.status",
+      null,
+    )) as BastionStatus;
+    expect(status.org).toBe("acme");
   });
 
   it("reports no sandbox for an unknown thread", async () => {
     const { harness } = await load();
     expect(
       await harness.behavior.callRpc("sandboxes.get", { threadId: "thread-2" }),
-    ).toEqual({ sandbox: null });
+    ).toEqual({ sandbox: null, consoleUrl: null });
   });
 
   it("deletes every sandbox", async () => {

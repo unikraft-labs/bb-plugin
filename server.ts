@@ -4,7 +4,12 @@ import { z } from "zod";
 import type { BbBastionPluginApi } from "./bastion/api/index";
 import type { models } from "./bastion/api/api/index.gen";
 import { createBastionClient, unwrap } from "./bastion/client";
-import { startBastion, stopBastion } from "./bastion/lifecycle";
+import {
+  consoleInstanceUrl,
+  startBastion,
+  stopBastion,
+  ukcOrgFromToken,
+} from "./bastion/lifecycle";
 import {
   describeMissing,
   isResolved,
@@ -43,6 +48,7 @@ const statusSchema = z.object({
   ready: z.boolean(),
   version: z.string().nullable(),
   metro: z.string().nullable(),
+  org: z.string().nullable(),
   template: z.object({ key: z.string(), state: z.string() }).nullable(),
   counts: z
     .object({
@@ -60,6 +66,7 @@ const templateSchema = z.object({ key: z.string(), state: z.string() });
 const settingsViewSchema = z.object({
   mode: z.string(),
   ukcMetro: z.string(),
+  ukcOrg: z.string(),
   bastionUrl: z.string(),
   bastionImage: z.string(),
   bastionVcpus: z.number(),
@@ -84,6 +91,7 @@ const settingsWriteSchema = z.object({
   mode: z.enum(["managed", "external"]).optional(),
   ukcToken: z.string().nullable().optional(),
   ukcMetro: z.string().optional(),
+  ukcOrg: z.string().optional(),
   bastionUrl: z.string().optional(),
   bastionToken: z.string().nullable().optional(),
   bastionImage: z.string().optional(),
@@ -119,7 +127,10 @@ export const rpcContract = defineRpcContract({
   },
   "sandboxes.get": {
     input: z.object({ threadId: z.string() }),
-    output: z.object({ sandbox: sandboxSchema.nullable() }),
+    output: z.object({
+      sandbox: sandboxSchema.nullable(),
+      consoleUrl: z.string().nullable(),
+    }),
   },
   "sandboxes.deleteAll": {
     input: z.null(),
@@ -268,6 +279,27 @@ export default async function plugin(bb: BbPluginApi) {
     await reload();
   }
 
+  function org(): string | null {
+    if (resolved === null) return null;
+    const name =
+      resolved.ukcOrg === ""
+        ? ukcOrgFromToken(resolved.ukcToken)
+        : resolved.ukcOrg;
+    return name === "" ? null : name;
+  }
+
+  function metro(): string | null {
+    const name = health?.metro ?? resolved?.ukcMetro ?? "";
+    return name === "" || name.includes("://") ? null : name;
+  }
+
+  function consoleUrl(name: string): string | null {
+    const organisation = org();
+    const location = metro();
+    if (organisation === null || location === null || name === "") return null;
+    return consoleInstanceUrl(organisation, location, name);
+  }
+
   function currentStatus(): BastionStatus {
     const state = status();
     return {
@@ -280,6 +312,7 @@ export default async function plugin(bb: BbPluginApi) {
       ready: health?.ready ?? false,
       version: health?.version ?? null,
       metro: health?.metro ?? null,
+      org: org(),
       template: health === null ? null : health.template,
       counts: health === null ? null : health.sandboxes,
       error: healthError,
@@ -421,6 +454,7 @@ export default async function plugin(bb: BbPluginApi) {
     return {
       mode: values.mode,
       ukcMetro: values.ukcMetro ?? "",
+      ukcOrg: values.ukcOrg ?? "",
       bastionUrl: values.bastionUrl ?? "",
       bastionImage: values.bastionImage,
       bastionVcpus: values.bastionVcpus,
@@ -469,9 +503,13 @@ export default async function plugin(bb: BbPluginApi) {
     "bastion.start": () => start(),
     "bastion.stop": () => stop(),
     "sandboxes.list": async () => ({ sandboxes: await listSandboxes() }),
-    "sandboxes.get": async ({ threadId }) => ({
-      sandbox: await readSandbox(threadId),
-    }),
+    "sandboxes.get": async ({ threadId }) => {
+      const sandbox = await readSandbox(threadId);
+      return {
+        sandbox,
+        consoleUrl: sandbox === null ? null : consoleUrl(sandbox.name),
+      };
+    },
     "sandboxes.deleteAll": async () => ({ deleted: await deleteAllSandboxes() }),
     "template.warm": ({ force }) => warmTemplate(force ?? false),
     "settings.read": () => readSettings(),
@@ -499,6 +537,7 @@ export default async function plugin(bb: BbPluginApi) {
     ];
     if (view.version !== null) lines.push(`version       ${view.version}`);
     if (view.metro !== null) lines.push(`metro         ${view.metro}`);
+    if (view.org !== null) lines.push(`org           ${view.org}`);
     if (view.template !== null) {
       lines.push(`template      ${view.template.state} (${view.template.key})`);
     }
@@ -607,7 +646,13 @@ export default async function plugin(bb: BbPluginApi) {
                 stderr: `No sandbox serves thread ${argument}.`,
               };
             }
-            return reply(sandbox, formatSandboxes([sandbox]));
+            const url = consoleUrl(sandbox.name);
+            return reply(
+              { ...sandbox, consoleUrl: url },
+              url === null
+                ? formatSandboxes([sandbox])
+                : `${formatSandboxes([sandbox])}\n${url}`,
+            );
           }
           case "delete-sandboxes": {
             const deleted = await deleteAllSandboxes();
