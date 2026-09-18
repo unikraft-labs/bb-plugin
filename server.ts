@@ -33,6 +33,8 @@ const sandboxSchema = z.object({
   state: z.string(),
   vcpus: z.number(),
   memoryMb: z.number(),
+  fqdn: z.string().nullable(),
+  services: z.array(z.object({ port: z.number(), url: z.string() })),
   lastActivityAt: z.string().nullable(),
   createdAt: z.string(),
 });
@@ -153,6 +155,11 @@ function toSandboxView(sandbox: models.SandboxResponseData): SandboxView {
     state: sandbox.state,
     vcpus: sandbox.vcpus,
     memoryMb: sandbox.memory_mb,
+    fqdn: sandbox.fqdn ?? null,
+    services: (sandbox.services ?? []).map((service) => ({
+      port: service.port,
+      url: service.url,
+    })),
     lastActivityAt: sandbox.last_activity_at ?? null,
     createdAt: sandbox.created_at,
   };
@@ -554,10 +561,14 @@ export default async function plugin(bb: BbPluginApi) {
   function formatSandboxes(sandboxes: SandboxView[]): string {
     if (sandboxes.length === 0) return "No sandboxes.";
     return sandboxes
-      .map(
-        (sandbox) =>
-          `${sandbox.state.padEnd(9)} ${sandbox.name}  ${sandbox.vcpus} vCPU  ${sandbox.memoryMb} MiB  ${sandbox.id}`,
-      )
+      .map((sandbox) => {
+        const line = `${sandbox.state.padEnd(9)} ${sandbox.name}  ${sandbox.vcpus} vCPU  ${sandbox.memoryMb} MiB  ${sandbox.id}`;
+        if (sandbox.services.length === 0) return line;
+        const urls = sandbox.services
+          .map((service) => `  ${service.url}`)
+          .join("\n");
+        return `${line}\n${urls}`;
+      })
       .join("\n");
   }
 

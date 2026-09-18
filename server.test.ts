@@ -16,6 +16,8 @@ const SANDBOX = {
   state: "running",
   vcpus: 1,
   memory_mb: 4096,
+  fqdn: "bbx-thread-1.fra.unikraft.app",
+  services: [{ port: 8080, url: "https://bbx-thread-1.fra.unikraft.app:8080" }],
   created_at: "2026-01-01T00:00:00Z",
 };
 
@@ -234,6 +236,10 @@ describe("sandbox rpc", () => {
         state: "running",
         vcpus: 1,
         memoryMb: 4096,
+        fqdn: "bbx-thread-1.fra.unikraft.app",
+        services: [
+          { port: 8080, url: "https://bbx-thread-1.fra.unikraft.app:8080" },
+        ],
         lastActivityAt: null,
         createdAt: "2026-01-01T00:00:00Z",
       },
