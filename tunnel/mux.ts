@@ -123,6 +123,12 @@ export const DEFAULT_SILENCE_TIMEOUT_MS = 45_000;
 /** How long the WebSocket upgrade may take before the attempt is abandoned. */
 export const DEFAULT_HANDSHAKE_TIMEOUT_MS = 15_000;
 
+/**
+ * How long a stopping tunnel waits for its close handshake before the socket
+ * is torn down outright. A peer that is gone never answers the handshake.
+ */
+export const DEFAULT_CLOSE_GRACE_MS = 1_000;
+
 export type SocketFactory = (target: TunnelTarget) => Socket;
 
 function defaultSocketFactory(target: TunnelTarget): Socket {
@@ -382,6 +388,8 @@ export interface TunnelOptions {
   silenceTimeoutMs?: number;
   /** How long an upgrade may take before the attempt is abandoned. */
   handshakeTimeoutMs?: number;
+  /** How long a stop waits for the close handshake before terminating. */
+  closeGraceMs?: number;
   onConnected?: (connected: boolean) => void;
   dial?: SocketFactory;
   createSocket?: (url: string, token: string) => WebSocket;
@@ -420,6 +428,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
   const silenceTimeoutMs = options.silenceTimeoutMs ?? DEFAULT_SILENCE_TIMEOUT_MS;
   const handshakeTimeoutMs =
     options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
+  const closeGraceMs = options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS;
   const create =
     options.createSocket ??
     ((url: string, token: string) =>
@@ -433,7 +442,18 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
     try {
       await new Promise<void>((resolve, reject) => {
         const socket = create(url, options.token);
-        const abort = () => socket.close(1000, "stopping");
+        let grace: ReturnType<typeof setTimeout> | null = null;
+        // Stopping asks for a clean close but does not wait on a peer that
+        // may no longer be there to answer it: after the grace the socket
+        // is torn down, which fires the close event this attempt ends on.
+        const abort = () => {
+          socket.close(1000, "stopping");
+          grace = setTimeout(() => socket.terminate(), closeGraceMs);
+        };
+        const settle = () => {
+          options.signal.removeEventListener("abort", abort);
+          if (grace !== null) clearTimeout(grace);
+        };
         options.signal.addEventListener("abort", abort, { once: true });
         socket.on("open", () => {
           opened = true;
@@ -443,11 +463,11 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
           new TunnelSession(socket, target, log, dial, silenceTimeoutMs);
         });
         socket.on("error", (error: Error) => {
-          options.signal.removeEventListener("abort", abort);
+          settle();
           reject(error);
         });
         socket.on("close", () => {
-          options.signal.removeEventListener("abort", abort);
+          settle();
           resolve();
         });
       });

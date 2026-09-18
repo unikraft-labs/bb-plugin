@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -365,6 +366,44 @@ describe("runTunnel", () => {
     expect(socket.readyState).toBe(socket.OPEN);
     controller.abort();
     await tunnel;
+  });
+
+  it("stops without waiting on a peer that will not answer the close", async () => {
+    // A socket whose peer is gone: close() starts a handshake nobody
+    // completes, and only terminate() ever produces a close event.
+    class DeadSocket extends EventEmitter {
+      readyState = 1;
+      readonly OPEN = 1;
+      closeCalls = 0;
+      constructor() {
+        super();
+        queueMicrotask(() => this.emit("open"));
+      }
+      send(): void {}
+      close(): void {
+        this.closeCalls += 1;
+      }
+      terminate(): void {
+        this.readyState = 3;
+        this.emit("close", 1006, Buffer.alloc(0));
+      }
+    }
+    const dead = new DeadSocket();
+    const controller = new AbortController();
+    const started = Date.now();
+    const tunnel = runTunnel({
+      bastionUrl: "http://bastion.invalid",
+      token: "tunnel-token",
+      loopbackBaseUrl: "http://127.0.0.1:1",
+      signal: controller.signal,
+      closeGraceMs: 50,
+      createSocket: () => dead as unknown as WebSocket,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.abort();
+    await tunnel;
+    expect(dead.closeCalls).toBe(1);
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 
   it("closes a stream the bb server refuses", async () => {
