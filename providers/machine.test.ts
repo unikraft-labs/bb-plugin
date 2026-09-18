@@ -55,8 +55,14 @@ describe("isNotFound", () => {
 });
 
 describe("machineName", () => {
-  it("ends with the tail of the host id", () => {
-    expect(machineName("host_ABC-123456")).toBe("Unikraft Cloud sandbox 123456");
+  it("ends with the instance name", () => {
+    expect(machineName("bbx-thr-abc123")).toBe(
+      "Unikraft Cloud sandbox bbx-thr-abc123",
+    );
+  });
+
+  it("falls back when the instance has no name", () => {
+    expect(machineName("")).toBe("Unikraft Cloud sandbox");
   });
 });
 

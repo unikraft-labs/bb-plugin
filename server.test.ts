@@ -352,7 +352,7 @@ describe("machine provider", () => {
 
     expect(result).toEqual({
       status: "created",
-      name: "Unikraft Cloud sandbox abc123",
+      name: "Unikraft Cloud sandbox bbx-thread-1",
       resource: {
         sandboxId: "thread-1",
         instanceUuid: "instance-uuid",

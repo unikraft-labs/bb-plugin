@@ -67,11 +67,11 @@ export function isNotFound(error: unknown): boolean {
   return false;
 }
 
-export function machineName(hostId: string): string {
-  const suffix = hostId.replace(/[^a-z0-9]/giu, "").slice(-6);
-  return suffix === ""
+export function machineName(instanceName: string): string {
+  const name = instanceName.trim();
+  return name === ""
     ? "Unikraft Cloud sandbox"
-    : `Unikraft Cloud sandbox ${suffix}`;
+    : `Unikraft Cloud sandbox ${name}`;
 }
 
 export function sandboxExecutor(
@@ -159,13 +159,13 @@ export function registerMachine(bb: BbPluginApi, deps: MachineDeps): void {
         };
         await context.checkpoint(resource);
         context.report.step("Enrolling the sandbox with bb…");
-        const { hostId } = await bb.experimental_machines.bootstrap({
+        await bb.experimental_machines.bootstrap({
           key: context.key,
           executor: sandboxExecutor(client, sandbox.id),
           report: context.report,
           signal: context.signal,
         });
-        return { status: "created", name: machineName(hostId), resource };
+        return { status: "created", name: machineName(resource.name), resource };
       } catch (error) {
         return { status: "failed", message: describeError(error) };
       }
