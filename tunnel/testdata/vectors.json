@@ -1,0 +1,92 @@
+{
+  "subprotocol": "bb-bastion-tunnel.v1",
+  "initial_window": 262144,
+  "max_data_payload": 65536,
+  "frames": [
+    {
+      "name": "open stream 1",
+      "hex": "0000000101",
+      "stream_id": 1,
+      "op": "OPEN",
+      "payload_hex": ""
+    },
+    {
+      "name": "data stream 1 'hi'",
+      "hex": "00000001026869",
+      "stream_id": 1,
+      "op": "DATA",
+      "payload_hex": "6869"
+    },
+    {
+      "name": "window stream 1 +65536",
+      "hex": "000000010400010000",
+      "stream_id": 1,
+      "op": "WINDOW",
+      "payload_hex": "00010000",
+      "increment": 65536
+    },
+    {
+      "name": "close stream 1 no reason",
+      "hex": "0000000103",
+      "stream_id": 1,
+      "op": "CLOSE",
+      "payload_hex": ""
+    },
+    {
+      "name": "close stream 2 with reason",
+      "hex": "00000002036469616c3a2045434f4e4e52454655534544",
+      "stream_id": 2,
+      "op": "CLOSE",
+      "payload_hex": "6469616c3a2045434f4e4e52454655534544",
+      "reason": "dial: ECONNREFUSED"
+    },
+    {
+      "name": "ping",
+      "hex": "00000000050102030405060708",
+      "stream_id": 0,
+      "op": "PING",
+      "payload_hex": "0102030405060708"
+    },
+    {
+      "name": "pong",
+      "hex": "00000000060102030405060708",
+      "stream_id": 0,
+      "op": "PONG",
+      "payload_hex": "0102030405060708"
+    },
+    {
+      "name": "max stream id open",
+      "hex": "ffffffff01",
+      "stream_id": 4294967295,
+      "op": "OPEN",
+      "payload_hex": ""
+    }
+  ],
+  "invalid": [
+    {
+      "name": "truncated header",
+      "hex": "00000001",
+      "error": "protocol"
+    },
+    {
+      "name": "unknown op",
+      "hex": "0000000109",
+      "error": "protocol"
+    },
+    {
+      "name": "window on stream 0",
+      "hex": "000000000400000001",
+      "error": "protocol"
+    },
+    {
+      "name": "data on stream 0",
+      "hex": "000000000200",
+      "error": "protocol"
+    },
+    {
+      "name": "window with short payload",
+      "hex": "00000001040001",
+      "error": "protocol"
+    }
+  ]
+}
