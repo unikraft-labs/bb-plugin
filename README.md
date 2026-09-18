@@ -90,11 +90,12 @@ only; every field left empty keeps the configured default.
 | Exposed ports | Each port added with **+** is published to the Internet on the public port of the same number. |
 
 An exposed port gives the sandbox a Unikraft Cloud service group and, with it,
-a public hostname, which the settings section and `bb unikraft-cloud sandbox
-<thread-id>` print as a URL once the sandbox exists. Port 80 is served over
-HTTP, port 443 and every other port over HTTPS, as the platform requires:
-port 8080 on a sandbox called `bbx-abc` is reached at
-`https://bbx-abc-<hash>.<metro>.unikraft.app:8080`.
+a public hostname. Unikraft Cloud generates that hostname and it does not
+follow from the sandbox's name, so read it from the settings section or from
+`bb unikraft-cloud sandbox <thread-id>`, which print one URL per port once the
+sandbox exists. Port 80 is served over HTTP and every other port over HTTPS,
+as the platform requires, on the public port of the same number:
+`https://<generated>.<metro>.unikraft.app:8080`.
 
 The thread's machine is named after its sandbox instance, so bb's machine line
 under the input reads `Unikraft Cloud (bbx-…)`, with the name linked to the

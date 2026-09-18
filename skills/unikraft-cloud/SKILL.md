@@ -69,8 +69,9 @@ JSON:
 - `ports` — each port is published to the Internet on the public port of the
   same number, which gives the sandbox a public hostname. Port 80 is served
   over HTTP and everything else over HTTPS, so port 8080 is reached at
-  `https://<sandbox>-<hash>.<metro>.unikraft.app:8080`. `sandbox <thread-id>`
-  prints the URLs once the sandbox exists.
+  `https://<generated>.<metro>.unikraft.app:8080`. Unikraft Cloud generates
+  that hostname and it does not follow from the sandbox's name, so read the
+  URLs from `sandbox <thread-id>` once the sandbox exists.
 
 There is no flag for these: a thread is created with them in the picker, and
 they cannot be changed afterwards without a new thread.
