@@ -71,7 +71,8 @@ JSON:
   over HTTP and everything else over HTTPS, so port 8080 is reached at
   `https://<generated>.<metro>.unikraft.app:8080`. Unikraft Cloud generates
   that hostname and it does not follow from the sandbox's name, so read the
-  URLs from `sandbox <thread-id>` once the sandbox exists.
+  URLs from `sandbox <thread-id>` once the sandbox exists, or from the menu
+  beside the sandbox's state in the thread header.
 
 There is no flag for these: a thread is created with them in the picker, and
 they cannot be changed afterwards without a new thread.

@@ -97,6 +97,10 @@ sandbox exists. Port 80 is served over HTTP and every other port over HTTPS,
 as the platform requires, on the public port of the same number:
 `https://<generated>.<metro>.unikraft.app:8080`.
 
+A sandbox that publishes a port carries a menu beside its state pill in the
+thread header, listing every published port as `<hostname>:<port>`. Each one
+opens over HTTPS.
+
 The thread's machine is named after its sandbox instance, so bb's machine line
 under the input reads `Unikraft Cloud (bbx-…)`, with the name linked to the
 instance in the Unikraft Cloud console once the organisation is known. The
