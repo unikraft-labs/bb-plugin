@@ -24,6 +24,7 @@
     "server.ts",
     "app.tsx",
     "configuration.ts",
+    "configuration.test.ts",
     "components",
     "lib",
     "hooks",
