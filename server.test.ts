@@ -297,6 +297,20 @@ describe("cli", () => {
     expect(result.stdout).toContain("bbx-thread-1");
   });
 
+  it("mirrors one thread's sandbox", async () => {
+    const { harness } = await load();
+    const result = await harness.behavior.runCli(["sandbox", "thread-1"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("running");
+  });
+
+  it("reports a thread without a sandbox", async () => {
+    const { harness } = await load();
+    const result = await harness.behavior.runCli(["sandbox", "thread-2"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("thread-2");
+  });
+
   it("prints usage without a command", async () => {
     const { harness } = await load();
     expect((await harness.behavior.runCli([])).stdout).toContain(

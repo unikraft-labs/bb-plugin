@@ -19,6 +19,7 @@ plugin's settings section: everything below can be done from either.
 | `bb unikraft-cloud start` | Create the bastion (managed mode) or wait for it (external mode), then warm the sandbox template. |
 | `bb unikraft-cloud stop` | Delete the bastion. Sandboxes stay in standby. |
 | `bb unikraft-cloud sandboxes` | List every sandbox with its state and size. |
+| `bb unikraft-cloud sandbox <thread-id>` | Show the state and size of the sandbox serving one thread. |
 | `bb unikraft-cloud delete-sandboxes` | Delete every sandbox and its filesystem. |
 | `bb unikraft-cloud warm [--force]` | Build the sandbox template ahead of the first thread. |
 

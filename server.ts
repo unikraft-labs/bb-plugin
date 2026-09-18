@@ -484,6 +484,7 @@ export default async function plugin(bb: BbPluginApi) {
     "  bb unikraft-cloud start [--json]",
     "  bb unikraft-cloud stop [--json]",
     "  bb unikraft-cloud sandboxes [--json]",
+    "  bb unikraft-cloud sandbox <thread-id> [--json]",
     "  bb unikraft-cloud delete-sandboxes [--json]",
     "  bb unikraft-cloud warm [--force] [--json]",
   ].join("\n");
@@ -546,6 +547,11 @@ export default async function plugin(bb: BbPluginApi) {
         usage: "bb unikraft-cloud sandboxes [--json]",
       },
       {
+        name: "sandbox",
+        summary: "Show the sandbox serving one thread",
+        usage: "bb unikraft-cloud sandbox <thread-id> [--json]",
+      },
+      {
         name: "delete-sandboxes",
         summary: "Delete every sandbox",
         usage: "bb unikraft-cloud delete-sandboxes [--json]",
@@ -559,7 +565,7 @@ export default async function plugin(bb: BbPluginApi) {
     async run(argv) {
       const json = argv.includes("--json");
       const force = argv.includes("--force");
-      const [command] = argv.filter((arg) => !arg.startsWith("--"));
+      const [command, argument] = argv.filter((arg) => !arg.startsWith("--"));
       const reply = (value: unknown, text: string) => ({
         exitCode: 0,
         stdout: json ? JSON.stringify(value) : text,
@@ -591,6 +597,17 @@ export default async function plugin(bb: BbPluginApi) {
           case "sandboxes": {
             const sandboxes = await listSandboxes();
             return reply(sandboxes, formatSandboxes(sandboxes));
+          }
+          case "sandbox": {
+            if (argument === undefined) return { exitCode: 1, stderr: usage };
+            const sandbox = await readSandbox(argument);
+            if (sandbox === null) {
+              return {
+                exitCode: 1,
+                stderr: `No sandbox serves thread ${argument}.`,
+              };
+            }
+            return reply(sandbox, formatSandboxes([sandbox]));
           }
           case "delete-sandboxes": {
             const deleted = await deleteAllSandboxes();
