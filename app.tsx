@@ -216,6 +216,7 @@ function SandboxTable({
           <TableHead>Sandbox</TableHead>
           <TableHead>State</TableHead>
           <TableHead>Size</TableHead>
+          <TableHead>Exposed</TableHead>
           <TableHead>Created</TableHead>
         </TableRow>
       </TableHeader>
@@ -226,6 +227,25 @@ function SandboxTable({
             <TableCell>{sandbox.state}</TableCell>
             <TableCell>
               {sandbox.vcpus} vCPU · {sandbox.memoryMb} MiB
+            </TableCell>
+            <TableCell>
+              {sandbox.services.length === 0 ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                <div className="flex flex-col">
+                  {sandbox.services.map((service) => (
+                    <a
+                      key={service.port}
+                      href={service.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-xs underline underline-offset-2"
+                    >
+                      {service.port}
+                    </a>
+                  ))}
+                </div>
+              )}
             </TableCell>
             <TableCell className="text-muted-foreground">
               {new Date(sandbox.createdAt).toLocaleString()}
