@@ -21,6 +21,8 @@ function values(overrides: Partial<SettingValues> = {}): SettingValues {
     sandboxVcpus: 1,
     sandboxMemoryMb: 4096,
     sandboxExtraEnv: "{}",
+    sandboxPrepare: "curl -fsSL https://claude.ai/install.sh | bash",
+    sandboxPrepareTimeout: "5m",
     sandboxCooldownMs: 5000,
     sandboxTtl: "168h",
     templateEnabled: true,
@@ -83,6 +85,23 @@ describe("resolve", () => {
     expect(isResolved(result) && result.sandbox.extraEnv).toEqual({
       HTTP_PROXY: "http://proxy:3128",
     });
+  });
+
+  it("reads one prepare command per non-empty line", () => {
+    const result = resolve(
+      values({ sandboxPrepare: "  first  \n\n second \n  " }),
+      "0.43.1",
+    );
+    expect(isResolved(result) && result.sandbox.prepare).toEqual([
+      "first",
+      "second",
+    ]);
+    expect(isResolved(result) && result.sandbox.prepareTimeout).toBe("5m");
+  });
+
+  it("resolves no prepare commands from an empty setting", () => {
+    const result = resolve(values({ sandboxPrepare: "  \n " }), "0.43.1");
+    expect(isResolved(result) && result.sandbox.prepare).toEqual([]);
   });
 
   it("rejects a sandbox environment that is not a string map", () => {

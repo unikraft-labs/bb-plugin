@@ -77,6 +77,21 @@ export const SETTING_DESCRIPTORS = {
     experimental_multiline: true,
     default: "{}",
   },
+  sandboxPrepare: {
+    type: "string",
+    label: "Sandbox prepare commands",
+    description:
+      "Shell commands, one per line, run once inside a fresh sandbox: the template seed, or a sandbox created straight from the image. Agent CLIs belong here.",
+    experimental_multiline: true,
+    default: "curl -fsSL https://claude.ai/install.sh | bash",
+  },
+  sandboxPrepareTimeout: {
+    type: "string",
+    label: "Sandbox prepare timeout",
+    description:
+      "How long the prepare commands may run before the sandbox is given up on, as a Go duration.",
+    default: "5m",
+  },
   sandboxCooldownMs: {
     type: "number",
     label: "Scale-to-zero cooldown (ms)",
@@ -118,6 +133,8 @@ export interface SettingValues {
   sandboxVcpus: number;
   sandboxMemoryMb: number;
   sandboxExtraEnv: string;
+  sandboxPrepare: string;
+  sandboxPrepareTimeout: string;
   sandboxCooldownMs: number;
   sandboxTtl: string;
   templateEnabled: boolean;
@@ -130,6 +147,8 @@ export interface ResolvedSandbox {
   vcpus: number;
   memoryMb: number;
   extraEnv: Record<string, string>;
+  prepare: string[];
+  prepareTimeout: string;
   cooldownMs: number;
   ttl: string;
 }
@@ -206,6 +225,13 @@ function parseExtraEnv(raw: string): Record<string, string> | null {
   return entries;
 }
 
+function parsePrepare(raw: string): string[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
 function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/u, "");
 }
@@ -254,6 +280,8 @@ export function resolve(
       vcpus: values.sandboxVcpus,
       memoryMb: values.sandboxMemoryMb,
       extraEnv: extraEnv ?? {},
+      prepare: parsePrepare(values.sandboxPrepare),
+      prepareTimeout: values.sandboxPrepareTimeout,
       cooldownMs: values.sandboxCooldownMs,
       ttl: values.sandboxTtl,
     },

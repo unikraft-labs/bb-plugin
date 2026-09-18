@@ -26,6 +26,8 @@ function settings(overrides: Partial<ResolvedSettings> = {}): ResolvedSettings {
       vcpus: 1,
       memoryMb: 4096,
       extraEnv: {},
+      prepare: [],
+      prepareTimeout: "5m",
       cooldownMs: 5000,
       ttl: "168h",
     },
