@@ -57,7 +57,7 @@ export const SETTING_DESCRIPTORS = {
   sandboxImage: {
     type: "string",
     label: "Sandbox base image",
-    description: "The image must contain git.",
+    description: "Any image with a glibc dynamic loader and /bin/sh. The plugin ROM supplies git, curl, TLS roots and the Claude Code CLI whenever the image lacks them.",
     default: "debian:latest",
   },
   sandboxRom: {
