@@ -68,10 +68,11 @@ export function createTransport(options: TransportOptions): Transport {
     const response = await call(url, init);
     if (!response.ok) {
       const body = await response.text().catch(() => "");
+      const detail = envelopeMessage(body);
       throw new BastionRequestError(
         response.status,
         body,
-        `${args.method} ${args.path} failed with HTTP ${response.status}`,
+        `${args.method} ${args.path} failed with HTTP ${response.status}${detail ? `: ${detail}` : ""}`,
       );
     }
     return response;
@@ -125,4 +126,20 @@ export function createTransport(options: TransportOptions): Transport {
       }
     },
   };
+}
+
+function envelopeMessage(body: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "message" in parsed &&
+      typeof parsed.message === "string" &&
+      parsed.message !== ""
+    ) {
+      return parsed.message;
+    }
+  } catch {}
+  return undefined;
 }
