@@ -83,11 +83,11 @@ Start a new thread and pick **Unikraft Cloud** in the environment picker. The
 size chip next to the row starts on the configured defaults and overrides
 vCPUs and memory for that thread only.
 
-The thread's machine is named after its sandbox instance, and the thread
-header reads `Unikraft Cloud (<sandbox>)` with a pill carrying the sandbox's
-state; the sandbox name links to the instance in the Unikraft Cloud console
-once the organisation is known. `bb unikraft-cloud sandbox <thread-id>` prints
-the same state and link on the command line.
+The thread's machine is named after its sandbox instance. Under the composer
+the thread reads `Unikraft Cloud (<sandbox>)`, where the name links to the
+instance in the Unikraft Cloud console once the organisation is known, and the
+thread header carries a pill with the sandbox's state. `bb unikraft-cloud
+sandbox <thread-id>` prints the same state and link on the command line.
 
 bb owns the sandbox from there: archiving or deleting the thread deletes its
 sandbox. Stopping the bastion leaves sandboxes in standby; **Delete all
