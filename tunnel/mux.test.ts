@@ -313,6 +313,60 @@ describe("runTunnel", () => {
     await tunnel;
   });
 
+  it("gives up a tunnel that goes silent and reconnects", async () => {
+    const test = await harness("ok");
+    const controller = new AbortController();
+    const warnings: string[] = [];
+    const tunnel = runTunnel({
+      bastionUrl: test.bastionUrl,
+      token: "tunnel-token",
+      loopbackBaseUrl: test.loopbackBaseUrl,
+      signal: controller.signal,
+      minBackoffMs: 10,
+      silenceTimeoutMs: 100,
+      log: { info: () => {}, warn: (message) => warnings.push(message) },
+    });
+    const first = await test.next();
+    const closed = new Promise<number>((resolve) => {
+      first.on("close", (code) => resolve(code));
+    });
+    // The bastion never pings: the client must not wait on TCP to notice.
+    const second = await test.next();
+    expect(second).not.toBe(first);
+    expect(await closed).toBe(1006);
+    expect(warnings.some((w) => w.includes("silent for 100ms"))).toBe(true);
+    controller.abort();
+    await tunnel;
+  });
+
+  it("keeps a tunnel the bastion pings", async () => {
+    const test = await harness("ok");
+    const controller = new AbortController();
+    let connections = 0;
+    const tunnel = runTunnel({
+      bastionUrl: test.bastionUrl,
+      token: "tunnel-token",
+      loopbackBaseUrl: test.loopbackBaseUrl,
+      signal: controller.signal,
+      minBackoffMs: 10,
+      silenceTimeoutMs: 120,
+      onConnected: (connected) => {
+        if (connected) connections += 1;
+      },
+    });
+    const socket = await test.next();
+    const nonce = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
+    const pinger = setInterval(() => {
+      socket.send(encodeFrame(0, OP_PING, nonce), { binary: true });
+    }, 40);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    clearInterval(pinger);
+    expect(connections).toBe(1);
+    expect(socket.readyState).toBe(socket.OPEN);
+    controller.abort();
+    await tunnel;
+  });
+
   it("closes a stream the bb server refuses", async () => {
     const test = await harness("ok");
     const controller = new AbortController();

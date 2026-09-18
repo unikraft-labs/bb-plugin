@@ -111,6 +111,18 @@ export interface TunnelLogger {
 
 const SILENT: TunnelLogger = { info: () => {}, warn: () => {} };
 
+/**
+ * How long the tunnel may stay silent before the client gives it up. The
+ * bastion pings every 15 s, so this is three missed pings: long enough to
+ * ride out a stall, short enough that a tunnel whose peer went away (a
+ * laptop that changed networks never sees the bastion's FIN) is replaced
+ * before anyone waits on it for long.
+ */
+export const DEFAULT_SILENCE_TIMEOUT_MS = 45_000;
+
+/** How long the WebSocket upgrade may take before the attempt is abandoned. */
+export const DEFAULT_HANDSHAKE_TIMEOUT_MS = 15_000;
+
 export type SocketFactory = (target: TunnelTarget) => Socket;
 
 function defaultSocketFactory(target: TunnelTarget): Socket {
@@ -151,14 +163,17 @@ export class TunnelSession {
   private readonly streams = new Map<number, StreamState>();
   private readonly closed = new Set<number>();
   private failed = false;
+  private silence: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly socket: WebSocket,
     private readonly target: TunnelTarget,
     private readonly log: TunnelLogger,
     private readonly dial: SocketFactory,
+    private readonly silenceTimeoutMs = DEFAULT_SILENCE_TIMEOUT_MS,
   ) {
     socket.on("message", (data, isBinary) => {
+      this.heard();
       if (!isBinary) {
         this.fail("the tunnel carries binary frames only");
         return;
@@ -167,6 +182,26 @@ export class TunnelSession {
     });
     socket.on("close", () => this.teardown());
     socket.on("error", () => this.teardown());
+    this.heard();
+  }
+
+  /**
+   * Re-arms the silence timer. The bastion pings on a schedule, so a tunnel
+   * that carries nothing at all for the timeout has lost its peer, whatever
+   * the socket still believes: TCP alone never notices a peer that vanished
+   * without a FIN. Terminating the socket fires its close event, which is
+   * what runTunnel reconnects on.
+   */
+  private heard(): void {
+    if (this.silence !== null) clearTimeout(this.silence);
+    this.silence = setTimeout(() => {
+      this.silence = null;
+      this.log.warn(
+        `tunnel silent for ${this.silenceTimeoutMs}ms; closing it to reconnect`,
+      );
+      this.socket.terminate();
+      this.teardown();
+    }, this.silenceTimeoutMs);
   }
 
   private send(frame: Uint8Array): void {
@@ -183,6 +218,10 @@ export class TunnelSession {
   }
 
   private teardown(): void {
+    if (this.silence !== null) {
+      clearTimeout(this.silence);
+      this.silence = null;
+    }
     for (const stream of this.streams.values()) {
       if (stream.owedTimer !== null) clearTimeout(stream.owedTimer);
       stream.socket?.destroy();
@@ -339,14 +378,23 @@ export interface TunnelOptions {
   log?: TunnelLogger;
   minBackoffMs?: number;
   maxBackoffMs?: number;
+  /** Silence after which a tunnel is torn down and reopened. */
+  silenceTimeoutMs?: number;
+  /** How long an upgrade may take before the attempt is abandoned. */
+  handshakeTimeoutMs?: number;
   onConnected?: (connected: boolean) => void;
   dial?: SocketFactory;
   createSocket?: (url: string, token: string) => WebSocket;
 }
 
-function defaultWebSocket(url: string, token: string): WebSocket {
+function defaultWebSocket(
+  url: string,
+  token: string,
+  handshakeTimeout: number,
+): WebSocket {
   return new WebSocket(url, [TUNNEL_SUBPROTOCOL], {
     headers: { authorization: `Bearer ${token}` },
+    handshakeTimeout,
   });
 }
 
@@ -369,7 +417,13 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
   const min = options.minBackoffMs ?? 1_000;
   const max = options.maxBackoffMs ?? 30_000;
   const dial = options.dial ?? defaultSocketFactory;
-  const create = options.createSocket ?? defaultWebSocket;
+  const silenceTimeoutMs = options.silenceTimeoutMs ?? DEFAULT_SILENCE_TIMEOUT_MS;
+  const handshakeTimeoutMs =
+    options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
+  const create =
+    options.createSocket ??
+    ((url: string, token: string) =>
+      defaultWebSocket(url, token, handshakeTimeoutMs));
   const target = parseTarget(options.loopbackBaseUrl);
   const url = tunnelUrl(options.bastionUrl);
   let backoff = min;
@@ -386,7 +440,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
           backoff = min;
           log.info("tunnel connected");
           options.onConnected?.(true);
-          new TunnelSession(socket, target, log, dial);
+          new TunnelSession(socket, target, log, dial, silenceTimeoutMs);
         });
         socket.on("error", (error: Error) => {
           options.signal.removeEventListener("abort", abort);
