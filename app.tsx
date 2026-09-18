@@ -7,7 +7,10 @@ import {
   useRealtime,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
-import type { PluginMachineProviderInputsProps } from "@get-bb/plugin-sdk";
+import type {
+  PluginMachineProviderInputsProps,
+  PluginThreadHeaderActionProps,
+} from "@get-bb/plugin-sdk";
 import type {
   BastionStatus,
   rpcContract,
@@ -741,11 +744,11 @@ const SANDBOX_STATE_DOT: Record<string, string> = {
   deleting: "bg-amber-500",
 };
 
-function SandboxLine() {
+function useSandbox(threadId: string | null): {
+  sandbox: SandboxView | null;
+  consoleUrl: string | null;
+} {
   const rpc = useRpc<typeof rpcContract>();
-  const view = useComposerView();
-  const isCompactViewport = useIsCompactViewport();
-  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
   const [sandbox, setSandbox] = useState<SandboxView | null>(null);
   const [consoleUrl, setConsoleUrl] = useState<string | null>(null);
 
@@ -775,42 +778,69 @@ function SandboxLine() {
 
   useRealtime("bastion-changed", refresh);
 
+  return { sandbox, consoleUrl };
+}
+
+function SandboxStatePill({
+  threadId,
+  isCompactViewport,
+}: PluginThreadHeaderActionProps) {
+  const { sandbox } = useSandbox(threadId);
+
   if (sandbox === null) return null;
   return (
     <span
       role="status"
-      aria-label={`Unikraft Cloud sandbox ${sandbox.name} ${sandbox.state}`}
+      aria-label={`Unikraft Cloud sandbox ${sandbox.state}`}
       title={`${sandbox.name} · ${sandbox.state}`}
-      className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
     >
-      {isCompactViewport ? null : (
-        <span>
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
+        )}
+        aria-hidden
+      />
+      {isCompactViewport ? null : sandbox.state}
+    </span>
+  );
+}
+
+function SandboxLine() {
+  const view = useComposerView();
+  const isCompactViewport = useIsCompactViewport();
+  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
+  const { sandbox, consoleUrl } = useSandbox(threadId);
+
+  if (sandbox === null) return null;
+  const name =
+    consoleUrl === null ? (
+      <span className="font-mono text-xs">{sandbox.name}</span>
+    ) : (
+      <UrlLink
+        href={consoleUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-mono text-xs underline underline-offset-2 hover:text-foreground"
+      >
+        {sandbox.name}
+      </UrlLink>
+    );
+  return (
+    <span
+      title={`${sandbox.name} on Unikraft Cloud`}
+      className="inline-flex items-center whitespace-nowrap text-xs text-muted-foreground"
+    >
+      {isCompactViewport ? (
+        name
+      ) : (
+        <>
           {"Unikraft Cloud ("}
-          {consoleUrl === null ? (
-            <span className="font-mono text-xs">{sandbox.name}</span>
-          ) : (
-            <UrlLink
-              href={consoleUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-xs underline underline-offset-2 hover:text-foreground"
-            >
-              {sandbox.name}
-            </UrlLink>
-          )}
+          {name}
           {")"}
-        </span>
+        </>
       )}
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5">
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
-          )}
-          aria-hidden
-        />
-        {isCompactViewport ? null : sandbox.state}
-      </span>
     </span>
   );
 }
@@ -826,6 +856,11 @@ export default definePluginApp((app) => {
   app.slots.experimental_machineProviderInputs({
     machineProviderId: MACHINE_PROVIDER_ID,
     component: SandboxSizeInputs,
+  });
+  app.slots.experimental_threadHeaderAction({
+    id: "sandbox-state",
+    title: "Unikraft Cloud sandbox",
+    component: SandboxStatePill,
   });
   app.composer.customize({
     id: "unikraft-cloud-sandbox",
