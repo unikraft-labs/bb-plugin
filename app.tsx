@@ -26,6 +26,12 @@ import { FloatingInput } from "@/components/ui/floating-input";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -47,6 +53,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { decorateTree } from "@/lib/machine-line";
+import {
+  serviceLinks,
+  type SandboxServiceLink,
+} from "@/lib/sandbox-services";
 import {
   parseSandboxOptions,
   submissionFor,
@@ -889,6 +899,38 @@ function useSandbox(threadId: string | null): {
   return { sandbox, consoleUrl };
 }
 
+function SandboxServiceMenu({ links }: { links: SandboxServiceLink[] }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${links.length} exposed ${links.length === 1 ? "service" : "services"}`}
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
+        >
+          <Icon name="Plug02" className="size-3" />
+          {links.length}
+          <Icon name="ChevronDown" className="size-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-0">
+        {links.map((link) => (
+          <DropdownMenuItem key={link.port} asChild>
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-xs"
+            >
+              {link.label}
+            </a>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function SandboxStatePill({
   threadId,
   isCompactViewport,
@@ -896,21 +938,25 @@ function SandboxStatePill({
   const { sandbox } = useSandbox(threadId);
 
   if (sandbox === null) return null;
+  const links = serviceLinks(sandbox.fqdn, sandbox.services);
   return (
-    <span
-      role="status"
-      aria-label={`Unikraft Cloud sandbox ${sandbox.state}`}
-      title={`${sandbox.name} · ${sandbox.state}`}
-      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
-    >
+    <span className="inline-flex items-center gap-1.5">
       <span
-        className={cn(
-          "size-1.5 rounded-full",
-          SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
-        )}
-        aria-hidden
-      />
-      {isCompactViewport ? null : sandbox.state}
+        role="status"
+        aria-label={`Unikraft Cloud sandbox ${sandbox.state}`}
+        title={`${sandbox.name} · ${sandbox.state}`}
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+      >
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
+          )}
+          aria-hidden
+        />
+        {isCompactViewport ? null : sandbox.state}
+      </span>
+      {links.length === 0 ? null : <SandboxServiceMenu links={links} />}
     </span>
   );
 }
