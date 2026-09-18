@@ -3,6 +3,7 @@ import type { BbBastionPluginApi } from "../bastion/api/index";
 import { BastionError } from "../bastion/client";
 import {
   isNotFound,
+  MACHINE_INPUTS_SCHEMA,
   machineName,
   sandboxExecutor,
   toBootstrapRequest,
@@ -158,4 +159,28 @@ it("toBootstrapRequest accepts an epoch-millisecond expiry", () => {
     }),
   );
   expect(request.expires_at).toBe("2026-01-01T00:00:00.000Z");
+});
+
+describe("MACHINE_INPUTS_SCHEMA", () => {
+  it("accepts an image and a list of ports", () => {
+    const parsed = MACHINE_INPUTS_SCHEMA.parse({
+      vcpus: 2,
+      image: "ubuntu:24.04",
+      ports: [8080, 3000],
+    });
+    expect(parsed).toEqual({
+      vcpus: 2,
+      image: "ubuntu:24.04",
+      ports: [8080, 3000],
+    });
+  });
+
+  it("rejects a port outside the range", () => {
+    expect(() => MACHINE_INPUTS_SCHEMA.parse({ ports: [0] })).toThrow();
+    expect(() => MACHINE_INPUTS_SCHEMA.parse({ ports: [70000] })).toThrow();
+  });
+
+  it("rejects an empty image", () => {
+    expect(() => MACHINE_INPUTS_SCHEMA.parse({ image: "" })).toThrow();
+  });
 });

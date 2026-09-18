@@ -15,6 +15,8 @@ export const MACHINE_INPUTS_SCHEMA = z
   .object({
     vcpus: z.number().int().min(1).max(16).optional(),
     memoryMb: z.number().int().min(256).max(65_536).optional(),
+    image: z.string().min(1).optional(),
+    ports: z.array(z.number().int().min(1).max(65_535)).max(16).optional(),
   })
   .nullish();
 
@@ -148,6 +150,8 @@ export function registerMachine(bb: BbPluginApi, deps: MachineDeps): void {
               thread_id: context.key,
               vcpus: inputs?.vcpus ?? defaults.vcpus,
               memory_mb: inputs?.memoryMb ?? defaults.memoryMb,
+              ...(inputs?.image === undefined ? {} : { image: inputs.image }),
+              ...(inputs?.ports === undefined ? {} : { ports: inputs.ports }),
             },
             signal: context.signal,
           }),
