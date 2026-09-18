@@ -43,13 +43,17 @@ import {
 } from "@/components/ui/table";
 import { decorateTree } from "@/lib/machine-line";
 import {
+  nextInterval,
+  SANDBOX_POLL_MS,
+  type PollOutcome,
+} from "@/lib/sandbox-poll";
+import {
   consoleUrlFor,
   rememberSandbox,
   subscribeSandboxes,
 } from "@/lib/sandbox-store";
 import { cn } from "@/lib/utils";
 
-const SANDBOX_POLL_MS = 5_000;
 const MACHINE_PROVIDER_ID = "unikraft-cloud-sandbox";
 
 function message(cause: unknown): string {
@@ -750,35 +754,49 @@ function useSandbox(threadId: string | null): {
   const rpc = useRpc<typeof rpcContract>();
   const [sandbox, setSandbox] = useState<SandboxView | null>(null);
   const [consoleUrl, setConsoleUrl] = useState<string | null>(null);
+  const [pulse, setPulse] = useState(0);
 
-  const refresh = useCallback(() => {
+  useRealtime("bastion-changed", () => setPulse((count) => count + 1));
+
+  useEffect(() => {
     if (threadId === null) {
       setSandbox(null);
       setConsoleUrl(null);
       return;
     }
-    rpc.call("sandboxes.get", { threadId }).then(
-      (result) => {
-        setSandbox(result.sandbox);
-        setConsoleUrl(result.consoleUrl);
-        if (result.sandbox !== null) {
-          rememberSandbox(result.sandbox.name, result.consoleUrl);
-        }
-      },
-      () => {
-        setSandbox(null);
-        setConsoleUrl(null);
-      },
-    );
-  }, [rpc, threadId]);
-
-  useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, SANDBOX_POLL_MS);
-    return () => clearInterval(timer);
-  }, [refresh]);
-
-  useRealtime("bastion-changed", refresh);
+    let live = true;
+    let interval = SANDBOX_POLL_MS;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = (outcome: PollOutcome) => {
+      if (!live) return;
+      interval = nextInterval(interval, outcome);
+      timer = setTimeout(poll, interval);
+    };
+    const poll = () => {
+      rpc.call("sandboxes.get", { threadId }).then(
+        (result) => {
+          if (!live) return;
+          setSandbox(result.sandbox);
+          setConsoleUrl(result.consoleUrl);
+          if (result.sandbox !== null) {
+            rememberSandbox(result.sandbox.name, result.consoleUrl);
+          }
+          schedule(result.sandbox === null ? "missing" : "found");
+        },
+        () => {
+          if (!live) return;
+          setSandbox(null);
+          setConsoleUrl(null);
+          schedule("failed");
+        },
+      );
+    };
+    poll();
+    return () => {
+      live = false;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [rpc, threadId, pulse]);
 
   return { sandbox, consoleUrl };
 }
