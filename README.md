@@ -83,9 +83,9 @@ Start a new thread and pick **Unikraft Cloud** in the environment picker. The
 size chip next to the row starts on the configured defaults and overrides
 vCPUs and memory for that thread only.
 
-The thread's machine is named after its sandbox instance. Under the composer
-the thread reads `Unikraft Cloud (<sandbox>)`, where the name links to the
-instance in the Unikraft Cloud console once the organisation is known, and the
+The thread's machine is named after its sandbox instance, so bb's machine line
+under the input reads `Unikraft Cloud (bbx-…)`, with the name linked to the
+instance in the Unikraft Cloud console once the organisation is known. The
 thread header carries a pill with the sandbox's state. `bb unikraft-cloud
 sandbox <thread-id>` prints the same state and link on the command line.
 
