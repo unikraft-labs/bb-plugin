@@ -46,13 +46,17 @@ Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
 | Sandbox ROM | derived | Empty selects the ROM published for this bb version. |
 | Sandbox vCPUs / memory | 1 / 4096 MiB | Overridable per thread. |
 | Sandbox environment | `{}` | A JSON object added to every sandbox. |
+| Sandbox prepare commands | the Claude Code installer | Shell commands, one per line, run once in a fresh sandbox — the template seed, or a sandbox built straight from the image. Agent CLIs belong here. |
+| Sandbox prepare timeout | `5m` | A Go duration bounding those commands. |
 | Scale-to-zero cooldown | 5000 ms | How long a sandbox idles before freezing. |
 | Sandbox lifetime | `168h` | A stopped sandbox is deleted after this. |
 | Warm a sandbox template | on | Builds a template so the first thread starts fast. |
 | Sandbox listen port | 7443 | The loopback port a sandbox's daemon dials. |
 
 Secret fields are write-only: they show whether a value is stored, take a new
-one, and have a Clear button. A setting change reloads the plugin.
+one, and have a Clear button. A setting change reloads the plugin. Changing the
+prepare commands or their timeout rebuilds the template: run
+`bb unikraft-cloud warm` afterwards so the next thread starts from it.
 
 ## Choose Unikraft Cloud as the default machine access
 
@@ -92,6 +96,7 @@ sandboxes** removes them and their filesystems.
 | The row says there is no tunnel | The plugin cannot reach the bastion's `/v1/tunnel`. Check the bastion URL and token. |
 | A thread starts but never comes online | The default machine access is not Unikraft Cloud, so the sandbox dials an address it cannot reach. |
 | A thread fails with a git error | The sandbox base image has no `git`. |
+| A thread has no agent CLI | The prepare commands failed or timed out. Check the Sandbox prepare commands and rerun `bb unikraft-cloud warm --force`. |
 | `status` reports a ROM is missing | No ROM is published for this bb version. Set the Sandbox ROM setting to one that exists. |
 
 Plugin logs: `bb plugin logs unikraft-cloud`.

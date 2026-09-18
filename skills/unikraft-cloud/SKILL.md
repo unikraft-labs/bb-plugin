@@ -41,6 +41,17 @@ bb unikraft-cloud status
 A thread refuses to start while any of those is unmet, and the environment
 picker shows the same reason.
 
+## Preparing a sandbox
+
+**Sandbox prepare commands** are shell commands, one per line, run once inside a
+fresh sandbox: the template seed, or a sandbox created straight from the base
+image. They install what every thread needs — the Claude Code CLI by default —
+and **Sandbox prepare timeout** (a Go duration, `5m` by default) bounds them.
+
+Changing either setting invalidates the template. Run
+`bb unikraft-cloud warm --force` to rebuild it; until then the next thread pays
+for the preparation itself.
+
 ## Order of operations
 
 1. Set the Unikraft Cloud token and metro (managed mode), or the bastion URL
