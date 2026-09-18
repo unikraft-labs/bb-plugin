@@ -11,6 +11,7 @@ function values(overrides: Partial<SettingValues> = {}): SettingValues {
     mode: "managed",
     ukcToken: "token",
     ukcMetro: "fra",
+    ukcOrg: undefined,
     bastionUrl: undefined,
     bastionToken: "bastion-token",
     bastionImage: "index.unikraft.io/unikraft/bb-bastion:latest",
@@ -39,6 +40,13 @@ describe("resolve", () => {
     expect(result.mode).toBe("managed");
     expect(result.sandbox.rom).toBe(defaultSandboxRom("0.43.1"));
     expect(result.sandbox.extraEnv).toEqual({});
+  });
+
+  it("keeps the organisation override", () => {
+    const result = resolve(values({ ukcOrg: " acme " }), "0.43.1");
+    expect(isResolved(result)).toBe(true);
+    if (!isResolved(result)) return;
+    expect(result.ukcOrg).toBe("acme");
   });
 
   it("reports the credentials a managed configuration lacks", () => {

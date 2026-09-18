@@ -15,6 +15,7 @@ function settings(overrides: Partial<ResolvedSettings> = {}): ResolvedSettings {
     mode: "managed",
     ukcToken: "ukc-token",
     ukcMetro: "fra",
+    ukcOrg: "",
     bastionUrl: "",
     bastionToken: "bastion-token",
     bastionImage: "index.unikraft.io/unikraft/bb-bastion:latest",

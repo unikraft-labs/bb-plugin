@@ -20,6 +20,12 @@ export const SETTING_DESCRIPTORS = {
     label: "Unikraft Cloud metro",
     description: "The metro the bastion and every sandbox run in, such as fra.",
   },
+  ukcOrg: {
+    type: "string",
+    label: "Unikraft Cloud organisation",
+    description:
+      "The organisation console links point at. Managed mode reads it from the token; external mode needs it for those links.",
+  },
   bastionUrl: {
     type: "string",
     label: "Bastion URL",
@@ -123,6 +129,7 @@ export interface SettingValues {
   mode: string;
   ukcToken: string | undefined;
   ukcMetro: string | undefined;
+  ukcOrg: string | undefined;
   bastionUrl: string | undefined;
   bastionToken: string | undefined;
   bastionImage: string;
@@ -157,6 +164,7 @@ export interface ResolvedSettings {
   mode: "managed" | "external";
   ukcToken: string;
   ukcMetro: string;
+  ukcOrg: string;
   bastionUrl: string;
   bastionToken: string;
   bastionImage: string;
@@ -186,6 +194,7 @@ export function isResolved(result: ResolveResult): result is ResolvedSettings {
 export const SETTING_LABELS: Record<string, string> = {
   ukcToken: "Unikraft Cloud token",
   ukcMetro: "Unikraft Cloud metro",
+  ukcOrg: "Unikraft Cloud organisation",
   bastionUrl: "Bastion URL",
   bastionToken: "Bastion token",
   sandboxRom: "Sandbox ROM",
@@ -244,6 +253,7 @@ export function resolve(
   const mode = values.mode === "external" ? "external" : "managed";
   const ukcToken = trimmed(values.ukcToken);
   const ukcMetro = trimmed(values.ukcMetro);
+  const ukcOrg = trimmed(values.ukcOrg);
   const bastionUrl = normalizeBaseUrl(trimmed(values.bastionUrl));
   const bastionToken = trimmed(values.bastionToken);
 
@@ -269,6 +279,7 @@ export function resolve(
     mode,
     ukcToken,
     ukcMetro,
+    ukcOrg,
     bastionUrl,
     bastionToken,
     bastionImage: values.bastionImage,
