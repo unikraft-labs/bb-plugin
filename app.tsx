@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import type { PluginMachineProviderInputsProps } from "@get-bb/plugin-sdk";
+import type {
+  PluginMachineProviderInputsProps,
+  PluginThreadHeaderActionProps,
+} from "@get-bb/plugin-sdk";
 import type {
   BastionStatus,
   rpcContract,
@@ -715,6 +718,56 @@ function SandboxSizeInputs({ value, onChange }: PluginMachineProviderInputsProps
   );
 }
 
+const SANDBOX_STATE_DOT: Record<string, string> = {
+  running: "bg-emerald-500",
+  standby: "bg-indigo-500",
+  stopped: "bg-muted-foreground",
+  creating: "bg-amber-500",
+  deleting: "bg-amber-500",
+};
+
+function SandboxStatePill({
+  threadId,
+  isCompactViewport,
+}: PluginThreadHeaderActionProps) {
+  const rpc = useRpc<typeof rpcContract>();
+  const [sandbox, setSandbox] = useState<SandboxView | null>(null);
+
+  const refresh = useCallback(() => {
+    rpc.call("sandboxes.get", { threadId }).then(
+      (result) => setSandbox(result.sandbox),
+      () => setSandbox(null),
+    );
+  }, [rpc, threadId]);
+
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(refresh, SANDBOX_POLL_MS);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  useRealtime("bastion-changed", refresh);
+
+  if (sandbox === null) return null;
+  return (
+    <span
+      role="status"
+      aria-label={`Unikraft Cloud sandbox ${sandbox.state}`}
+      title={`${sandbox.name} · ${sandbox.state}`}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
+        )}
+        aria-hidden
+      />
+      {isCompactViewport ? null : sandbox.state}
+    </span>
+  );
+}
+
 export default definePluginApp((app) => {
   app.slots.settingsSection({
     id: "unikraft-cloud",
@@ -726,5 +779,10 @@ export default definePluginApp((app) => {
   app.slots.experimental_machineProviderInputs({
     machineProviderId: MACHINE_PROVIDER_ID,
     component: SandboxSizeInputs,
+  });
+  app.slots.experimental_threadHeaderAction({
+    id: "sandbox-state",
+    title: "Unikraft Cloud sandbox",
+    component: SandboxStatePill,
   });
 });
