@@ -63,6 +63,31 @@ export function ukcBaseUrl(metro: string): string {
     : `https://api.${metro}.unikraft.cloud`;
 }
 
+export const UKC_CONSOLE_URL = "https://console.unikraft.cloud";
+
+export function consoleInstanceUrl(
+  org: string,
+  metro: string,
+  name: string,
+): string {
+  return `${UKC_CONSOLE_URL}/org/${encodeURIComponent(org)}/instances/${encodeURIComponent(metro)}/${encodeURIComponent(name)}`;
+}
+
+export function ukcOrgFromToken(token: string): string {
+  const raw = token.trim();
+  if (raw === "") return "";
+  let decoded: string;
+  try {
+    decoded = Buffer.from(raw, "base64").toString("utf8");
+  } catch {
+    return "";
+  }
+  const user = decoded.split(":")[0] ?? "";
+  const subject = user.startsWith("robot$") ? user.slice("robot$".length) : user;
+  const name = subject.split(".")[0] ?? "";
+  return /^[a-z0-9][a-z0-9-]*$/iu.test(name) ? name : "";
+}
+
 function yamlString(value: string): string {
   return JSON.stringify(value);
 }

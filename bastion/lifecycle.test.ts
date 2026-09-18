@@ -7,7 +7,9 @@ import {
   renderBastionConfig,
   startBastion,
   stopBastion,
+  consoleInstanceUrl,
   ukcBaseUrl,
+  ukcOrgFromToken,
 } from "./lifecycle";
 
 function settings(overrides: Partial<ResolvedSettings> = {}): ResolvedSettings {
@@ -333,5 +335,33 @@ describe("stopBastion", () => {
       }),
     ).toEqual({ deleted: false });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("consoleInstanceUrl", () => {
+  it("addresses one instance in the console", () => {
+    expect(consoleInstanceUrl("acme", "fra", "bbx-thr-1")).toBe(
+      "https://console.unikraft.cloud/org/acme/instances/fra/bbx-thr-1",
+    );
+  });
+});
+
+describe("ukcOrgFromToken", () => {
+  it("reads the organisation out of a robot token", () => {
+    const token = Buffer.from(
+      "robot$acme.users.kraftcloud:secret",
+      "utf8",
+    ).toString("base64");
+    expect(ukcOrgFromToken(token)).toBe("acme");
+  });
+
+  it("accepts a token whose user is the organisation", () => {
+    const token = Buffer.from("acme:secret", "utf8").toString("base64");
+    expect(ukcOrgFromToken(token)).toBe("acme");
+  });
+
+  it("gives up on a token it cannot read", () => {
+    expect(ukcOrgFromToken("")).toBe("");
+    expect(ukcOrgFromToken("not a token")).toBe("");
   });
 });
