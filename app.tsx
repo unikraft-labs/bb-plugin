@@ -41,6 +41,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { decorateTree } from "@/lib/machine-line";
+import {
+  consoleUrlFor,
+  rememberSandbox,
+  subscribeSandboxes,
+} from "@/lib/sandbox-store";
 import { cn } from "@/lib/utils";
 
 const SANDBOX_POLL_MS = 5_000;
@@ -755,6 +761,9 @@ function useSandbox(threadId: string | null): {
       (result) => {
         setSandbox(result.sandbox);
         setConsoleUrl(result.consoleUrl);
+        if (result.sandbox !== null) {
+          rememberSandbox(result.sandbox.name, result.consoleUrl);
+        }
       },
       () => {
         setSandbox(null);
@@ -800,6 +809,14 @@ function SandboxStatePill({
   );
 }
 
+function decorateMachineLines(root: Node): void {
+  try {
+    decorateTree(root, consoleUrlFor);
+  } catch {
+    return;
+  }
+}
+
 export default definePluginApp((app) => {
   app.slots.settingsSection({
     id: "unikraft-cloud",
@@ -807,6 +824,37 @@ export default definePluginApp((app) => {
     description:
       "Run threads in Unikraft Cloud sandboxes that scale to zero between turns.",
     component: UnikraftCloudSettings,
+  });
+  app.contentScripts.register({
+    id: "sandbox-console-link",
+    mount(context) {
+      decorateMachineLines(document.body);
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === "characterData") {
+            decorateMachineLines(record.target);
+            continue;
+          }
+          for (const node of Array.from(record.addedNodes)) {
+            decorateMachineLines(node);
+          }
+        }
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      const unsubscribe = subscribeSandboxes(() => {
+        decorateMachineLines(document.body);
+      });
+      const stop = () => {
+        observer.disconnect();
+        unsubscribe();
+      };
+      context.signal.addEventListener("abort", stop, { once: true });
+      return stop;
+    },
   });
   app.slots.experimental_machineProviderInputs({
     machineProviderId: MACHINE_PROVIDER_ID,
