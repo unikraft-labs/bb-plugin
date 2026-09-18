@@ -23,8 +23,12 @@
   "include": [
     "server.ts",
     "app.tsx",
+    "configuration.ts",
     "components",
     "lib",
-    "hooks"
+    "hooks",
+    "providers",
+    "bastion",
+    "tunnel"
   ]
 }
