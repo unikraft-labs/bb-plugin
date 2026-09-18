@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import {
+  definePluginApp,
+  UrlLink,
+  useRealtime,
+  useRpc,
+} from "@get-bb/plugin-sdk/app";
 import type {
   PluginMachineProviderInputsProps,
   PluginThreadHeaderActionProps,
@@ -222,6 +227,7 @@ type Drafts = Record<string, string>;
 function draftsFrom(view: SettingsView): Drafts {
   return {
     ukcMetro: view.ukcMetro,
+    ukcOrg: view.ukcOrg,
     bastionUrl: view.bastionUrl,
     bastionImage: view.bastionImage,
     bastionVcpus: String(view.bastionVcpus),
@@ -330,6 +336,7 @@ function UnikraftCloudSettings() {
       const payload: SettingsWrite = {
         mode: mode === "external" ? "external" : "managed",
         ukcMetro: drafts.ukcMetro ?? "",
+        ukcOrg: drafts.ukcOrg ?? "",
         bastionUrl: drafts.bastionUrl ?? "",
         bastionImage: drafts.bastionImage ?? "",
         bastionVcpus: number("bastionVcpus", view.bastionVcpus),
@@ -441,6 +448,15 @@ function UnikraftCloudSettings() {
           <Input
             value={drafts.ukcMetro ?? ""}
             onChange={(event) => set("ukcMetro", event.target.value)}
+          />
+        </Field>
+        <Field
+          label="Organisation"
+          hint="Names the organisation in console links. Managed mode reads it from the token."
+        >
+          <Input
+            value={drafts.ukcOrg ?? ""}
+            onChange={(event) => set("ukcOrg", event.target.value)}
           />
         </Field>
         <Field
@@ -732,11 +748,18 @@ function SandboxStatePill({
 }: PluginThreadHeaderActionProps) {
   const rpc = useRpc<typeof rpcContract>();
   const [sandbox, setSandbox] = useState<SandboxView | null>(null);
+  const [consoleUrl, setConsoleUrl] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     rpc.call("sandboxes.get", { threadId }).then(
-      (result) => setSandbox(result.sandbox),
-      () => setSandbox(null),
+      (result) => {
+        setSandbox(result.sandbox);
+        setConsoleUrl(result.consoleUrl);
+      },
+      () => {
+        setSandbox(null);
+        setConsoleUrl(null);
+      },
     );
   }, [rpc, threadId]);
 
@@ -749,21 +772,42 @@ function SandboxStatePill({
   useRealtime("bastion-changed", refresh);
 
   if (sandbox === null) return null;
+  const dot = (
+    <span
+      className={cn(
+        "size-1.5 rounded-full",
+        SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
+      )}
+      aria-hidden
+    />
+  );
   return (
     <span
       role="status"
-      aria-label={`Unikraft Cloud sandbox ${sandbox.state}`}
+      aria-label={`Unikraft Cloud sandbox ${sandbox.name} ${sandbox.state}`}
       title={`${sandbox.name} · ${sandbox.state}`}
-      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
     >
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          SANDBOX_STATE_DOT[sandbox.state] ?? "bg-muted-foreground",
-        )}
-        aria-hidden
-      />
-      {isCompactViewport ? null : sandbox.state}
+      {isCompactViewport ? null : (
+        <span>
+          {"Unikraft Cloud ("}
+          {consoleUrl === null ? (
+            <span className="font-mono text-xs">{sandbox.name}</span>
+          ) : (
+            <UrlLink
+              href={consoleUrl}
+              className="font-mono text-xs underline underline-offset-2 hover:text-foreground"
+            >
+              {sandbox.name}
+            </UrlLink>
+          )}
+          {")"}
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5">
+        {dot}
+        {isCompactViewport ? null : sandbox.state}
+      </span>
     </span>
   );
 }
