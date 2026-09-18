@@ -43,7 +43,7 @@ Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
 | Bastion token | generated | Bearer token for the bastion's control API. Secret. |
 | Bastion image | `index.unikraft.io/unikraft/bb-bastion:latest` | |
 | Bastion vCPUs / memory | 1 / 1024 MiB | |
-| Sandbox base image | `index.unikraft.io/unikraft/bb-sandbox-base:latest` | Any image works if it has `git`, TLS roots and glibc; stock `debian` images lack `git`. |
+| Sandbox base image | `debian:latest` | Any image with a glibc dynamic loader and `/bin/sh`; `git`, `curl`, TLS roots and the Claude Code CLI come from the plugin ROM when the image lacks them, and the image's own copies win when present. |
 | Sandbox ROM | derived | Empty selects the ROM published for this bb version. |
 | Sandbox vCPUs / memory | 1 / 4096 MiB | Overridable per thread. |
 | Sandbox environment | `{}` | A JSON object added to every sandbox. |
@@ -102,7 +102,7 @@ sandboxes** removes them and their filesystems.
 | The row says there is no tunnel | The plugin cannot reach the bastion's `/v1/tunnel`. Check the bastion URL and token. |
 | A thread starts but never comes online | The default machine access is not Unikraft Cloud, so the sandbox dials an address it cannot reach. |
 | A thread fails with a git error | The sandbox base image has no `git`. |
-| A thread has no agent CLI | The sandbox base image lacks it; the default image ships Claude Code. |
+| A thread has no agent CLI | The ROM's fallback CLI should cover it; check `bb plugin logs unikraft-cloud` and the sandbox ROM setting. |
 | `status` reports a ROM is missing | No ROM is published for this bb version. Set the Sandbox ROM setting to one that exists. |
 
 Plugin logs: `bb plugin logs unikraft-cloud`.

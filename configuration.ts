@@ -58,7 +58,7 @@ export const SETTING_DESCRIPTORS = {
     type: "string",
     label: "Sandbox base image",
     description: "The image must contain git.",
-    default: "index.unikraft.io/unikraft/bb-sandbox-base:latest",
+    default: "debian:latest",
   },
   sandboxRom: {
     type: "string",
