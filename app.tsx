@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  definePluginApp,
-  UrlLink,
-  useComposerView,
-  useRealtime,
-  useRpc,
-} from "@get-bb/plugin-sdk/app";
+import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type {
   PluginMachineProviderInputsProps,
   PluginThreadHeaderActionProps,
@@ -47,7 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
 import { cn } from "@/lib/utils";
 
 const SANDBOX_POLL_MS = 5_000;
@@ -807,44 +800,6 @@ function SandboxStatePill({
   );
 }
 
-function SandboxLine() {
-  const view = useComposerView();
-  const isCompactViewport = useIsCompactViewport();
-  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
-  const { sandbox, consoleUrl } = useSandbox(threadId);
-
-  if (sandbox === null) return null;
-  const name =
-    consoleUrl === null ? (
-      <span className="font-mono text-xs">{sandbox.name}</span>
-    ) : (
-      <UrlLink
-        href={consoleUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-mono text-xs underline underline-offset-2 hover:text-foreground"
-      >
-        {sandbox.name}
-      </UrlLink>
-    );
-  return (
-    <span
-      title={`${sandbox.name} on Unikraft Cloud`}
-      className="inline-flex items-center whitespace-nowrap text-xs text-muted-foreground"
-    >
-      {isCompactViewport ? (
-        name
-      ) : (
-        <>
-          {"Unikraft Cloud ("}
-          {name}
-          {")"}
-        </>
-      )}
-    </span>
-  );
-}
-
 export default definePluginApp((app) => {
   app.slots.settingsSection({
     id: "unikraft-cloud",
@@ -861,10 +816,5 @@ export default definePluginApp((app) => {
     id: "sandbox-state",
     title: "Unikraft Cloud sandbox",
     component: SandboxStatePill,
-  });
-  app.composer.customize({
-    id: "unikraft-cloud-sandbox",
-    scopes: ["thread"],
-    actions: [{ id: "sandbox-state", component: SandboxLine }],
   });
 });
