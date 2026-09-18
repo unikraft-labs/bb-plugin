@@ -141,3 +141,15 @@ describe("sandboxExecutor", () => {
     expect(output.join("")).toContain("the sandbox is gone");
   });
 });
+
+it("toBootstrapRequest accepts an epoch-millisecond expiry", () => {
+  const request = toBootstrapRequest(
+    JSON.stringify({
+      hostId: "host_1",
+      serverUrl: "https://bb.example",
+      credential: "cred",
+      expiresAt: 1767225600000,
+    }),
+  );
+  expect(request.expires_at).toBe("2026-01-01T00:00:00.000Z");
+});

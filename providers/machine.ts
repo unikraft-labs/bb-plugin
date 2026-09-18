@@ -33,7 +33,7 @@ const ENROLLMENT_SCHEMA = z.object({
   serverUrl: z.string(),
   headers: z.record(z.string(), z.string()).optional(),
   credential: z.string(),
-  expiresAt: z.string(),
+  expiresAt: z.union([z.string(), z.number()]),
 });
 
 export interface MachineDefaults {
@@ -53,7 +53,10 @@ export function toBootstrapRequest(stdin: string): models.BootstrapRequest {
     host_id: enrollment.hostId,
     server_url: enrollment.serverUrl,
     credential: enrollment.credential,
-    expires_at: enrollment.expiresAt,
+    expires_at:
+      typeof enrollment.expiresAt === "number"
+        ? new Date(enrollment.expiresAt).toISOString()
+        : enrollment.expiresAt,
     ...(enrollment.headers === undefined ? {} : { headers: enrollment.headers }),
   };
 }
