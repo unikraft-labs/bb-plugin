@@ -227,6 +227,8 @@ function draftsFrom(view: SettingsView): Drafts {
     sandboxVcpus: String(view.sandboxVcpus),
     sandboxMemoryMb: String(view.sandboxMemoryMb),
     sandboxExtraEnv: view.sandboxExtraEnv,
+    sandboxPrepare: view.sandboxPrepare,
+    sandboxPrepareTimeout: view.sandboxPrepareTimeout,
     sandboxCooldownMs: String(view.sandboxCooldownMs),
     sandboxTtl: view.sandboxTtl,
     listenPort: String(view.listenPort),
@@ -333,6 +335,9 @@ function UnikraftCloudSettings() {
         sandboxVcpus: number("sandboxVcpus", view.sandboxVcpus),
         sandboxMemoryMb: number("sandboxMemoryMb", view.sandboxMemoryMb),
         sandboxExtraEnv: drafts.sandboxExtraEnv ?? "{}",
+        sandboxPrepare: drafts.sandboxPrepare ?? "",
+        sandboxPrepareTimeout:
+          drafts.sandboxPrepareTimeout ?? view.sandboxPrepareTimeout,
         sandboxCooldownMs: number("sandboxCooldownMs", view.sandboxCooldownMs),
         sandboxTtl: drafts.sandboxTtl ?? "",
         templateEnabled,
@@ -551,6 +556,26 @@ function UnikraftCloudSettings() {
             onChange={(event) => set("sandboxExtraEnv", event.target.value)}
           />
         </Field>
+        <Field
+          label="Sandbox prepare commands"
+          hint="One shell command per line, run once in the template seed or a new sandbox. Agent CLIs belong here."
+        >
+          <Textarea
+            className="min-h-24 font-mono text-xs"
+            value={drafts.sandboxPrepare ?? ""}
+            onChange={(event) => set("sandboxPrepare", event.target.value)}
+          />
+        </Field>
+        <div className="max-w-40">
+          <Field label="Prepare timeout" hint="A Go duration, such as 5m.">
+            <Input
+              value={drafts.sandboxPrepareTimeout ?? ""}
+              onChange={(event) =>
+                set("sandboxPrepareTimeout", event.target.value)
+              }
+            />
+          </Field>
+        </div>
         <label className="flex items-center gap-2 text-sm text-foreground">
           <Checkbox
             checked={templateEnabled}
