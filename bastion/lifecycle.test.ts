@@ -121,6 +121,26 @@ describe("renderBastionConfig", () => {
   it("renders an empty environment as an empty map", () => {
     expect(renderBastionConfig(settings())).toContain("  extra_env:\n    {}");
   });
+
+  it("renders the prepare commands as a list", () => {
+    const yaml = renderBastionConfig(
+      settings({
+        sandbox: {
+          ...settings().sandbox,
+          prepare: ["curl -fsSL https://claude.ai/install.sh | bash", "echo ok"],
+        },
+      }),
+    );
+    expect(yaml).toContain(
+      '  prepare:\n    - "curl -fsSL https://claude.ai/install.sh | bash"\n    - "echo ok"\n  prepare_timeout: "5m"\n',
+    );
+  });
+
+  it("renders no prepare commands as an empty list", () => {
+    expect(renderBastionConfig(settings())).toContain(
+      '  prepare: []\n  prepare_timeout: "5m"\n',
+    );
+  });
 });
 
 describe("buildCreateRequest", () => {

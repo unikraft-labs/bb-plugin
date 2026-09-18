@@ -78,6 +78,9 @@ function yamlMap(
 
 export function renderBastionConfig(settings: ResolvedSettings): string {
   const extraEnv = yamlMap(settings.sandbox.extraEnv, "    ");
+  const prepare = settings.sandbox.prepare.map(
+    (command) => `    - ${yamlString(command)}`,
+  );
   const lines = [
     "ukc:",
     `  metro: ${yamlString(settings.ukcMetro)}`,
@@ -93,6 +96,8 @@ export function renderBastionConfig(settings: ResolvedSettings): string {
     `    cooldown_ms: ${settings.sandbox.cooldownMs}`,
     "  extra_env:",
     ...(extraEnv.length === 0 ? ["    {}"] : extraEnv),
+    ...(prepare.length === 0 ? ["  prepare: []"] : ["  prepare:", ...prepare]),
+    `  prepare_timeout: ${yamlString(settings.sandbox.prepareTimeout)}`,
     "template:",
     `  enabled: ${settings.templateEnabled}`,
     "proxy:",
