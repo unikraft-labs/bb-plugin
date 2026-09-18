@@ -1,141 +1,109 @@
 # bb-plugin-unikraft-cloud
 
-A BB plugin that keeps a todo list. It shows every surface a plugin can own:
+Run bb threads in Unikraft Cloud sandboxes that scale to zero.
 
-- `server.ts` — the backend: a todo store in `bb.storage.kv`, RPC methods
-  for the page, a `bb unikraft-cloud` CLI command, a setting, and a realtime signal
-  that keeps every open page current.
-- `app.tsx` — the frontend: an **Example todos** page in the left sidebar
-  (`app.slots.navPanel`) built from the vendored components.
-- `skills/example-todos/SKILL.md` — a skill that tells agents how to keep the list
-  with `bb unikraft-cloud`. BB imports it into agent threads automatically.
-- `PLUGIN_OVERVIEW.md` — the store listing text: a longer version of
-  `bb.description` that the plugin detail page shows under it. See
-  [Store listing](#store-listing).
+The plugin adds one row, **Unikraft Cloud**, to bb's new-thread environment
+picker. Every thread started there gets its own Unikraft Cloud microVM — a
+*sandbox* — with the project checked out on it. Between turns the sandbox
+freezes and costs nothing; the next message wakes it.
 
-Try it: install the plugin, open **Example todos** in the sidebar, then run
-`bb unikraft-cloud add "Ship it"` in a terminal. The page updates at once.
+The plugin never talks to a sandbox directly. It talks to the **bastion**, a
+service on Unikraft Cloud that owns sandbox lifecycle and sits between each
+sandbox's bb host daemon and this bb server. The plugin can create that bastion
+itself (**managed** mode) or be pointed at one you run (**external** mode). One
+outbound WebSocket from the plugin to the bastion — the tunnel — is what lets a
+bastion on the public internet reach a bb server on a laptop.
 
-## UI components
-
-`components/ui/` is vendored source you own (the shadcn model): edit the
-files freely — they never update out from under you. Add more from the BB
-component registry (the full shadcn set, version-matched to your BB install
-via the pinned ref in `components.json`):
-
-```
-npx shadcn add @bb/select @bb/table
-```
-
-Run `npm install` once before `bb plugin build` — the vendored components'
-npm deps bundle into your dist. React, and BB-shimmed packages like the
-radix portal primitives and `sonner` (`import { toast } from "sonner"`
-reaches BB's own toaster), are provided by the BB app at runtime and never
-bundled. Every shimmed package is declared in `devDependencies` at the
-host's version so those imports typecheck; keep them there (never in
-`dependencies`, which would bundle a second copy), and `bb plugin types`
-repins them alongside the SDK. Ship `dist/` (npm tarball or committed for
-git installs) so people installing your plugin never need npm.
-
-## Manifest
-
-`package.json` is the plugin manifest. Notable fields:
-
-- `bb.server` — backend entry (required).
-- `bb.app` — frontend entry. Delete it, `app.tsx`, `components/`,
-  `hooks/`, and `lib/` for a headless plugin.
-- `bb.skills` — skill roots; omitted here, so BB reads `skills/`. Each
-  directory with a `SKILL.md` is one skill, named after the directory.
-- `bb.name` and `bb.description` — required human-facing identity.
-- `bb.branding` — required; declare `icon` as a BB icon name or a
-  plugin-relative compact SVG, or declare `logo.light` (with optional
-  `logo.dark`). Logo assets must be relative `.svg`, `.png`, or
-  `.webp` files.
-- `engines.bb` — supported bb app version range.
-- `engines.bbPluginSdk` — the lowest plugin SDK you need (scaffold:
-  `>=0.4.87`). BB reads this as a floor, not a ceiling: a later
-  SDK in the same major still loads your plugin.
-- `dependencies` — every package your source imports that BB does not provide.
-  `bb plugin build` inlines them into `dist/`, and git installs resolve this
-  list alone, so a build-required package here rather than in
-  `devDependencies` is what keeps your plugin installable. `devDependencies`
-  is for types and tooling only (BB shims React, the portal primitives, and
-  `@get-bb/plugin-sdk` at runtime — never bundle them).
-
-Run `bb plugin build` before publishing git/npm installs. It writes
-`dist/server.js` + `server.meta.json` and `app.js` / `app.css` /
-`app.meta.json`. Each `*.meta.json` stamps SDK major/version,
-`artifactFormatVersion`, `pluginId`, `pluginVersion`, and
-`builtWith` so managed installs can verify the artifacts.
-
-## Store listing
-
-Two texts describe the plugin in the store. `bb.description` in package.json
-is the one-sentence hook on every browse card and the lead paragraph on the
-detail page; keep it under about 140 characters. `PLUGIN_OVERVIEW.md` is the
-same claim at length, shown in an Overview section under that paragraph.
-Rewrite the scaffold's copy for your plugin, and update it whenever
-`bb.description` changes, so the two never disagree.
-
-The submission to the public BB Community marketplace requires the file. Keep
-it under 4000 characters (aim for 700 to 1800) and use headings, paragraphs,
-emphasis, code, blockquotes, lists, thematic breaks, and absolute https links
-only — raw HTML, images, tables, footnotes, and task lists are rejected. Do
-not open with a `#` title or repeat `bb.description` verbatim; the page
-shows both directly above.
+Licensed BSD-3-Clause.
 
 ## Install
 
-From this directory (`bb plugin new` already ran the install; a fresh clone
-needs it):
-
+```sh
+bb plugin install <path-or-git-url>
 ```
+
+From a clone:
+
+```sh
 npm install
 bb plugin install .
 ```
 
-After editing sources, reload:
+## Settings
 
+Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Mode | `managed` | `managed` creates the bastion; `external` uses yours. |
+| Unikraft Cloud token | — | Required in managed mode. Stored as a secret. |
+| Metro | — | The metro the bastion and its sandboxes run in, e.g. `fra`. |
+| Bastion URL | — | Filled in by managed mode; required in external mode. |
+| Bastion token | generated | Bearer token for the bastion's control API. Secret. |
+| Bastion image | `index.unikraft.io/unikraft/bb-bastion:latest` | |
+| Bastion vCPUs / memory | 1 / 1024 MiB | |
+| Sandbox base image | `debian:latest` | **Must contain `git`.** |
+| Sandbox ROM | derived | Empty selects the ROM published for this bb version. |
+| Sandbox vCPUs / memory | 1 / 4096 MiB | Overridable per thread. |
+| Sandbox environment | `{}` | A JSON object added to every sandbox. |
+| Scale-to-zero cooldown | 5000 ms | How long a sandbox idles before freezing. |
+| Sandbox lifetime | `168h` | A stopped sandbox is deleted after this. |
+| Warm a sandbox template | on | Builds a template so the first thread starts fast. |
+| Sandbox listen port | 7443 | The loopback port a sandbox's daemon dials. |
+
+Secret fields are write-only: they show whether a value is stored, take a new
+one, and have a Clear button. A setting change reloads the plugin.
+
+## Choose Unikraft Cloud as the default machine access
+
+Go to **Settings → Machines** and set the default machine access to **Unikraft
+Cloud**. This is what tells each enrolled sandbox the server URL to dial —
+`http://127.0.0.1:<listen port>` inside the sandbox, which the bastion relays
+back here through the tunnel. Without it a sandbox enrols against an address it
+cannot reach and the thread never comes online.
+
+## Start the bastion
+
+From the settings section press **Start bastion**, or:
+
+```sh
+bb unikraft-cloud start
+bb unikraft-cloud status
 ```
-bb plugin reload unikraft-cloud
+
+`status` must show the bastion `ready` and the tunnel `connected`. The same
+information is on the settings section, with the list of sandboxes.
+
+## First thread
+
+Start a new thread and pick **Unikraft Cloud** in the environment picker. The
+size chip next to the row overrides vCPUs and memory for that thread only.
+
+bb owns the sandbox from there: archiving or deleting the thread deletes its
+sandbox. Stopping the bastion leaves sandboxes in standby; **Delete all
+sandboxes** removes them and their filesystems.
+
+## Troubleshooting
+
+| Symptom | Cause |
+| --- | --- |
+| The picker row says setup is required | A setting is missing; the message names it. |
+| The row says the bastion is not ready | The bastion is not started, or its health check fails. Run `bb unikraft-cloud status`. |
+| The row says there is no tunnel | The plugin cannot reach the bastion's `/v1/tunnel`. Check the bastion URL and token. |
+| A thread starts but never comes online | The default machine access is not Unikraft Cloud, so the sandbox dials an address it cannot reach. |
+| A thread fails with a git error | The sandbox base image has no `git`. |
+| `status` reports a ROM is missing | No ROM is published for this bb version. Set the Sandbox ROM setting to one that exists. |
+
+Plugin logs: `bb plugin logs unikraft-cloud`.
+
+## Development
+
+```sh
+npm install
+npm run typecheck
+npx vitest run
+bb plugin build
 ```
 
-Or let `bb plugin dev` rebuild and reload on every save.
-
-## Configure
-
-```
-bb plugin config unikraft-cloud
-bb plugin config unikraft-cloud set showDone false
-bb plugin reload unikraft-cloud
-```
-
-## Types & API reference
-
-The plugin API ships as the npm package `@get-bb/plugin-sdk`, pinned to an
-exact version in `devDependencies` (`0.4.87` — the SDK of the BB
-that scaffolded this plugin). After `npm install`, the full surface is on disk
-at:
-
-```
-node_modules/@get-bb/plugin-sdk/bundled-types/bb-plugin-sdk.d.ts      # backend
-node_modules/@get-bb/plugin-sdk/bundled-types/bb-plugin-sdk-app.d.ts  # frontend
-```
-
-Your editor and `tsc` resolve `@get-bb/plugin-sdk` there through ordinary node
-resolution — no path mapping. These are readable declarations: open them for an
-exact signature.
-
-The SDK surface grows with every BB release, so the pin has to track the BB you
-actually run:
-
-```
-bb plugin types          # sync this plugin's SDK surface to the running BB
-bb plugin types --check  # CI: fail when it does not match
-```
-
-Ask BB to write plugins for you: the `bb-plugin-authoring` skill documents
-the whole surface with examples.
-
-Confused by the API, or need something the types don't explain? Clone the BB
-repo and read the source: <https://github.com/get-bb/bb>.
+`bastion/api/` is generated from the bastion's OpenAPI specification and is
+never edited by hand; `bastion/api/README.md` records the regeneration recipe.
