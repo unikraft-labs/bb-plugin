@@ -17,7 +17,7 @@ const FloatingInput = React.forwardRef<
       <Input id={inputId} className={className} ref={ref} {...props} />
       <label
         htmlFor={inputId}
-        className="absolute -top-1.5 left-2 bg-background px-1 text-xs leading-none text-muted-foreground"
+        className="absolute -top-1.5 left-2 bg-background px-1 text-[10px] leading-none text-muted-foreground"
       >
         {label}
       </label>
