@@ -10,10 +10,10 @@ regeneration is one commit of its own (`chore(api): Regenerate bastion client`).
 | -- | -- |
 | Generator | `tsplugingen` from `unikraft-cloud/plugin-sdk` (`js/tools/tsplugingen`) at commit `9ed197542ce3cd0783b70236bec81459eb6ab734` |
 | `openapi-gen` | `unikraft.com/x/tools/openapi-gen` v0.0.0-20260917145027-18995f09076a |
-| Contract version | v0.1.0 |
-| `specHash` | `4d6229cfadfbe97eb81b7368f26f2f5592a322832ddccbd98d2d9377e5a5dc3c` |
+| Contract version | v0.2.0 |
+| `specHash` | `a0570c41a14cf227e723ed82548ff44c69d861fd66076b9a669f0bb4bc96da4c` |
 | `templatesHash` | `2cd15f41edf4803148ad4aea46301ee6ffd2988ddcbdbc8ea627d84f2662ab57` |
-| `configHash` | `a64e689ca21026746bb3f00eb02b47af7557e38ab5d0d6c619041c267d05eb08` |
+| `configHash` | `efc3dc1eb01cf2cd6bdee2f0ea369b8909e636c79e53882d03049dcb643225e7` |
 
 The hashes are the ones the generator writes into its `package.json`, which
 is not vendored.

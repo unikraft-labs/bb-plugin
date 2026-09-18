@@ -91,6 +91,17 @@ export interface CreateSandboxRequest {
    * Environment variables added to the sandbox on top of the configured ones.
    */
   "extra_env"?: Record<string, string>;
+  /**
+   * Image the sandbox boots from; the configured one when omitted. Another
+   * image cannot be cloned from the warm template, so the sandbox is built
+   * from the image and takes longer to start.
+   */
+  "image"?: string;
+  /**
+   * Ports the sandbox publishes to the Internet, each on the public port of
+   * the same number.
+   */
+  "ports"?: number[];
 }
 
 /**
@@ -321,6 +332,15 @@ export interface SandboxResponseData {
    * Private FQDN the bastion reaches the instance at.
    */
   "private_fqdn": string;
+  /**
+   * Public FQDN of the sandbox's service group; absent when it publishes
+   * nothing.
+   */
+  "fqdn"?: string;
+  /**
+   * Ports the sandbox publishes to the Internet.
+   */
+  "services"?: SandboxService[];
   "state": SandboxState;
   "vcpus": number;
   "memory_mb": number;
@@ -332,6 +352,21 @@ export interface SandboxResponseData {
    * RFC 3339 instant the instance was created.
    */
   "created_at": string;
+}
+
+/**
+ * A port a sandbox publishes to the Internet.
+ */
+
+export interface SandboxService {
+  /**
+   * Public port, which is also the port the sandbox listens on.
+   */
+  "port": number;
+  /**
+   * URL the port is reached at from the Internet.
+   */
+  "url": string;
 }
 
 /**
