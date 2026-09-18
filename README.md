@@ -42,7 +42,7 @@ Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
 | Bastion token | generated | Bearer token for the bastion's control API. Secret. |
 | Bastion image | `index.unikraft.io/unikraft/bb-bastion:latest` | |
 | Bastion vCPUs / memory | 1 / 1024 MiB | |
-| Sandbox base image | `debian:latest` | **Must contain `git`.** |
+| Sandbox base image | `index.unikraft.io/unikraft/bb-sandbox-base:latest` | Any image works if it has `git`, TLS roots and glibc; stock `debian` images lack `git`. |
 | Sandbox ROM | derived | Empty selects the ROM published for this bb version. |
 | Sandbox vCPUs / memory | 1 / 4096 MiB | Overridable per thread. |
 | Sandbox environment | `{}` | A JSON object added to every sandbox. |
