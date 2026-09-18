@@ -43,14 +43,12 @@ picker shows the same reason.
 
 ## Preparing a sandbox
 
-**Sandbox prepare commands** are shell commands, one per line, run once inside a
-fresh sandbox: the template seed, or a sandbox created straight from the base
-image. They install what every thread needs — the Claude Code CLI by default —
-and **Sandbox prepare timeout** (a Go duration, `5m` by default) bounds them.
-
-Changing either setting invalidates the template. Run
-`bb unikraft-cloud warm --force` to rebuild it; until then the next thread pays
-for the preparation itself.
+**Sandbox prepare commands** are shell commands, one per line, run once inside
+every new sandbox before its first turn, and **Sandbox prepare timeout** (a Go
+duration, `5m` by default) bounds each of them. The base image already carries
+the Claude Code CLI; use prepare for extra tools a project needs. A sandbox's
+writable layer does not survive a stop, so the commands run per sandbox rather
+than once in the template.
 
 ## Order of operations
 

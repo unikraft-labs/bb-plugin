@@ -81,9 +81,9 @@ export const SETTING_DESCRIPTORS = {
     type: "string",
     label: "Sandbox prepare commands",
     description:
-      "Shell commands, one per line, run once inside a fresh sandbox: the template seed, or a sandbox created straight from the image. Agent CLIs belong here.",
+      "Shell commands, one per line, run once inside every new sandbox before its first turn. The base image already ships the Claude Code CLI; add extra tools here.",
     experimental_multiline: true,
-    default: "curl -fsSL https://claude.ai/install.sh | bash",
+    default: "",
   },
   sandboxPrepareTimeout: {
     type: "string",
