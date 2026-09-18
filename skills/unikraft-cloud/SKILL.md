@@ -18,8 +18,8 @@ plugin's settings section: everything below can be done from either.
 | `bb unikraft-cloud status` | Configuration, bastion health, tunnel state, sandbox counts. |
 | `bb unikraft-cloud start` | Create the bastion (managed mode) or wait for it (external mode), then warm the sandbox template. |
 | `bb unikraft-cloud stop` | Delete the bastion. Sandboxes stay in standby. |
-| `bb unikraft-cloud sandboxes` | List every sandbox with its state and size. |
-| `bb unikraft-cloud sandbox <thread-id>` | Show the state and size of the sandbox serving one thread, and its console link. bb's machine line under the input names the same sandbox and its state sits in the thread header. |
+| `bb unikraft-cloud sandboxes` | List every sandbox with its state, size and the URL of every port it publishes. |
+| `bb unikraft-cloud sandbox <thread-id>` | Show the state, size and published URLs of the sandbox serving one thread, and its console link. bb's machine line under the input names the same sandbox and its state sits in the thread header. |
 | `bb unikraft-cloud delete-sandboxes` | Delete every sandbox and its filesystem. |
 | `bb unikraft-cloud warm [--force]` | Build the sandbox template ahead of the first thread. |
 
@@ -52,6 +52,28 @@ duration, `5m` by default) bounds each of them. The base image already carries
 the Claude Code CLI; use prepare for extra tools a project needs. A sandbox's
 writable layer does not survive a stop, so the commands run per sandbox rather
 than once in the template.
+
+## Per-thread sandbox options
+
+The cog beside the **Unikraft Cloud** row in the new-thread environment picker
+sets the sandbox options of that thread alone; an empty field keeps the
+configured default. They are persisted with the thread's machine selection, as
+JSON:
+
+```json
+{ "vcpus": 2, "memoryMb": 8192, "image": "ubuntu:24.04", "ports": [8080] }
+```
+
+- `image` — another image cannot be cloned from the warm template, so the
+  thread starts slower than one on the configured image.
+- `ports` — each port is published to the Internet on the public port of the
+  same number, which gives the sandbox a public hostname. Port 80 is served
+  over HTTP and everything else over HTTPS, so port 8080 is reached at
+  `https://<sandbox>-<hash>.<metro>.unikraft.app:8080`. `sandbox <thread-id>`
+  prints the URLs once the sandbox exists.
+
+There is no flag for these: a thread is created with them in the picker, and
+they cannot be changed afterwards without a new thread.
 
 ## Order of operations
 

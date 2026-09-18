@@ -80,8 +80,21 @@ information is on the settings section, with the list of sandboxes.
 ## First thread
 
 Start a new thread and pick **Unikraft Cloud** in the environment picker. The
-size chip next to the row starts on the configured defaults and overrides
-vCPUs and memory for that thread only.
+cog next to the row opens the sandbox options, which apply to that thread
+only; every field left empty keeps the configured default.
+
+| Option | Effect |
+| --- | --- |
+| Image | The image the sandbox boots from. Another image cannot be cloned from the warm template, so the thread starts slower. |
+| vCPU, Memory | The size of the sandbox. |
+| Exposed ports | Each port added with **+** is published to the Internet on the public port of the same number. |
+
+An exposed port gives the sandbox a Unikraft Cloud service group and, with it,
+a public hostname, which the settings section and `bb unikraft-cloud sandbox
+<thread-id>` print as a URL once the sandbox exists. Port 80 is served over
+HTTP, port 443 and every other port over HTTPS, as the platform requires:
+port 8080 on a sandbox called `bbx-abc` is reached at
+`https://bbx-abc-<hash>.<metro>.unikraft.app:8080`.
 
 The thread's machine is named after its sandbox instance, so bb's machine line
 under the input reads `Unikraft Cloud (bbx-…)`, with the name linked to the
