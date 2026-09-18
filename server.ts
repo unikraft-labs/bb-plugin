@@ -57,6 +57,48 @@ export type BastionStatus = z.infer<typeof statusSchema>;
 
 const templateSchema = z.object({ key: z.string(), state: z.string() });
 
+const settingsViewSchema = z.object({
+  mode: z.string(),
+  ukcMetro: z.string(),
+  bastionUrl: z.string(),
+  bastionImage: z.string(),
+  bastionVcpus: z.number(),
+  bastionMemoryMb: z.number(),
+  sandboxImage: z.string(),
+  sandboxRom: z.string(),
+  sandboxVcpus: z.number(),
+  sandboxMemoryMb: z.number(),
+  sandboxExtraEnv: z.string(),
+  sandboxCooldownMs: z.number(),
+  sandboxTtl: z.string(),
+  templateEnabled: z.boolean(),
+  listenPort: z.number(),
+  hasUkcToken: z.boolean(),
+  hasBastionToken: z.boolean(),
+});
+export type SettingsView = z.infer<typeof settingsViewSchema>;
+
+const settingsWriteSchema = z.object({
+  mode: z.enum(["managed", "external"]).optional(),
+  ukcToken: z.string().nullable().optional(),
+  ukcMetro: z.string().optional(),
+  bastionUrl: z.string().optional(),
+  bastionToken: z.string().nullable().optional(),
+  bastionImage: z.string().optional(),
+  bastionVcpus: z.number().int().min(1).optional(),
+  bastionMemoryMb: z.number().int().min(128).optional(),
+  sandboxImage: z.string().optional(),
+  sandboxRom: z.string().optional(),
+  sandboxVcpus: z.number().int().min(1).optional(),
+  sandboxMemoryMb: z.number().int().min(256).optional(),
+  sandboxExtraEnv: z.string().optional(),
+  sandboxCooldownMs: z.number().int().min(0).optional(),
+  sandboxTtl: z.string().optional(),
+  templateEnabled: z.boolean().optional(),
+  listenPort: z.number().int().min(1).max(65_535).optional(),
+});
+export type SettingsWrite = z.infer<typeof settingsWriteSchema>;
+
 export const rpcContract = defineRpcContract({
   "bastion.status": { input: z.null(), output: statusSchema },
   "bastion.start": {
@@ -79,6 +121,8 @@ export const rpcContract = defineRpcContract({
     input: z.object({ force: z.boolean().optional() }),
     output: templateSchema,
   },
+  "settings.read": { input: z.null(), output: settingsViewSchema },
+  "settings.write": { input: settingsWriteSchema, output: settingsViewSchema },
 });
 
 function toSandboxView(sandbox: models.SandboxResponseData): SandboxView {
@@ -354,6 +398,49 @@ export default async function plugin(bb: BbPluginApi) {
     return { key: data.key, state: data.state };
   }
 
+  async function readSettings(): Promise<SettingsView> {
+    const values = await settings.get();
+    return {
+      mode: values.mode,
+      ukcMetro: values.ukcMetro ?? "",
+      bastionUrl: values.bastionUrl ?? "",
+      bastionImage: values.bastionImage,
+      bastionVcpus: values.bastionVcpus,
+      bastionMemoryMb: values.bastionMemoryMb,
+      sandboxImage: values.sandboxImage,
+      sandboxRom: values.sandboxRom ?? "",
+      sandboxVcpus: values.sandboxVcpus,
+      sandboxMemoryMb: values.sandboxMemoryMb,
+      sandboxExtraEnv: values.sandboxExtraEnv,
+      sandboxCooldownMs: values.sandboxCooldownMs,
+      sandboxTtl: values.sandboxTtl,
+      templateEnabled: values.templateEnabled,
+      listenPort: values.listenPort,
+      hasUkcToken: (values.ukcToken ?? "") !== "",
+      hasBastionToken: (values.bastionToken ?? "") !== "",
+    };
+  }
+
+  async function writeSettings(input: SettingsWrite): Promise<SettingsView> {
+    const update: Record<string, string | number | boolean | null> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value === undefined) continue;
+      if ((key === "ukcToken" || key === "bastionToken") && value === "") {
+        continue;
+      }
+      update[key] = value;
+    }
+    if (Object.keys(update).length > 0) {
+      await settings.experimental_set(update);
+    }
+    await ensureBastionToken();
+    await reload();
+    await refreshHealth();
+    bb.experimental_serverAccess.recheck();
+    publish();
+    return readSettings();
+  }
+
   bb.rpc.register(rpcContract, {
     "bastion.status": async () => {
       await refreshHealth();
@@ -364,6 +451,8 @@ export default async function plugin(bb: BbPluginApi) {
     "sandboxes.list": async () => ({ sandboxes: await listSandboxes() }),
     "sandboxes.deleteAll": async () => ({ deleted: await deleteAllSandboxes() }),
     "template.warm": ({ force }) => warmTemplate(force ?? false),
+    "settings.read": () => readSettings(),
+    "settings.write": (input) => writeSettings(input),
   });
 
   const usage = [

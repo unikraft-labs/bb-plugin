@@ -155,6 +155,8 @@ describe("plugin registration", () => {
       "bastion.stop",
       "sandboxes.deleteAll",
       "sandboxes.list",
+      "settings.read",
+      "settings.write",
       "template.warm",
     ]);
     expect(registrations.cli?.name).toBe("unikraft-cloud");
@@ -417,5 +419,46 @@ describe("server access provider", () => {
         signal: new AbortController().signal,
       }),
     ).toEqual({ status: "failed", message: expect.any(String) });
+  });
+});
+
+describe("settings rpc", () => {
+  it("reads values and hides the secrets themselves", async () => {
+    const { harness } = await load();
+    const view = (await harness.behavior.callRpc(
+      "settings.read",
+      null,
+    )) as Record<string, unknown>;
+    expect(view).toMatchObject({
+      mode: "external",
+      bastionUrl: bastion.url,
+      hasBastionToken: true,
+      hasUkcToken: false,
+      sandboxVcpus: 1,
+      sandboxMemoryMb: 4096,
+      listenPort: 7443,
+    });
+    expect(Object.keys(view)).not.toContain("bastionToken");
+  });
+
+  it("writes values and keeps an empty secret unchanged", async () => {
+    const { harness } = await load();
+    const view = (await harness.behavior.callRpc("settings.write", {
+      sandboxVcpus: 4,
+      sandboxImage: "ubuntu:latest",
+      bastionToken: "",
+    })) as Record<string, unknown>;
+    expect(view).toMatchObject({
+      sandboxVcpus: 4,
+      sandboxImage: "ubuntu:latest",
+      hasBastionToken: true,
+    });
+  });
+
+  it("refuses a value the descriptor does not allow", async () => {
+    const { harness } = await load();
+    await expect(
+      harness.behavior.callRpc("settings.write", { listenPort: 0 }),
+    ).rejects.toThrow();
   });
 });
