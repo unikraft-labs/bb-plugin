@@ -79,7 +79,12 @@ information is on the settings section, with the list of sandboxes.
 ## First thread
 
 Start a new thread and pick **Unikraft Cloud** in the environment picker. The
-size chip next to the row overrides vCPUs and memory for that thread only.
+size chip next to the row starts on the configured defaults and overrides
+vCPUs and memory for that thread only.
+
+The thread's machine is named after its sandbox instance, and the thread
+header carries a pill with the sandbox's state. `bb unikraft-cloud sandbox
+<thread-id>` prints the same state on the command line.
 
 bb owns the sandbox from there: archiving or deleting the thread deletes its
 sandbox. Stopping the bastion leaves sandboxes in standby; **Delete all
