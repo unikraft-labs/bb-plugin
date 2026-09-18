@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -544,8 +545,8 @@ function UnikraftCloudSettings() {
           label="Sandbox environment"
           hint="A JSON object added to every sandbox."
         >
-          <textarea
-            className="min-h-24 w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground"
+          <Textarea
+            className="min-h-24 font-mono text-xs"
             value={drafts.sandboxExtraEnv ?? ""}
             onChange={(event) => set("sandboxExtraEnv", event.target.value)}
           />
