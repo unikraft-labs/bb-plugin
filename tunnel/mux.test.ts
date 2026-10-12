@@ -340,6 +340,57 @@ describe("runTunnel", () => {
     expect(connections).toBe(1);
   });
 
+  it("keeps the backoff growing for tunnels that drop right after opening", async () => {
+    const test = await harness("ok");
+    const controller = new AbortController();
+    const opened: number[] = [];
+    const tunnel = runTunnel({
+      bastionUrl: test.bastionUrl,
+      token: "tunnel-token",
+      loopbackBaseUrl: test.loopbackBaseUrl,
+      signal: controller.signal,
+      minBackoffMs: 20,
+      maxBackoffMs: 1_000,
+      stableMs: 10_000,
+    });
+    for (let i = 0; i < 5; i += 1) {
+      const socket = await test.next();
+      opened.push(Date.now());
+      socket.close(1011, "restarting");
+    }
+    controller.abort();
+    await tunnel;
+    const gaps = opened.slice(1).map((at, i) => at - (opened[i] ?? at));
+    // 20, 40, 80, 160 ms; resetting on open would keep 20.
+    expect(gaps[3]).toBeGreaterThanOrEqual(120);
+    expect(gaps[3]).toBeGreaterThan(gaps[0] ?? 0);
+  });
+
+  it("resets the backoff once a tunnel has stayed up", async () => {
+    const test = await harness("ok");
+    const controller = new AbortController();
+    const tunnel = runTunnel({
+      bastionUrl: test.bastionUrl,
+      token: "tunnel-token",
+      loopbackBaseUrl: test.loopbackBaseUrl,
+      signal: controller.signal,
+      minBackoffMs: 20,
+      maxBackoffMs: 1_000,
+      stableMs: 150,
+    });
+    // Three quick drops grow the backoff to 160 ms.
+    for (let i = 0; i < 3; i += 1) (await test.next()).close(1011, "restarting");
+    const stable = await test.next();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const closedAt = Date.now();
+    stable.close(1011, "restarting");
+    await test.next();
+    const gap = Date.now() - closedAt;
+    controller.abort();
+    await tunnel;
+    expect(gap).toBeLessThan(80);
+  });
+
   it("gives up a tunnel that goes silent and reconnects", async () => {
     const test = await harness("ok");
     const controller = new AbortController();

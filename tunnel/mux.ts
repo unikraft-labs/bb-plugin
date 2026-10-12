@@ -126,6 +126,8 @@ export const DEFAULT_HANDSHAKE_TIMEOUT_MS = 15_000;
 /** Close code the bastion sends a tunnel it replaced. */
 export const REPLACED_CODE = 4000;
 
+/** Uptime after which a drop resets the reconnect backoff. */
+export const DEFAULT_STABLE_MS = 30_000;
 
 /**
  * How long a stopping tunnel waits for its close handshake before the socket
@@ -394,6 +396,8 @@ export interface TunnelOptions {
   handshakeTimeoutMs?: number;
   /** How long a stop waits for the close handshake before terminating. */
   closeGraceMs?: number;
+  /** Uptime after which a drop resets the backoff. */
+  stableMs?: number;
   onConnected?: (connected: boolean) => void;
   /** Another client took the tunnel; runTunnel returns. */
   onDisplaced?: () => void;
@@ -435,6 +439,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
   const handshakeTimeoutMs =
     options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
   const closeGraceMs = options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS;
+  const stableMs = options.stableMs ?? DEFAULT_STABLE_MS;
   const create =
     options.createSocket ??
     ((url: string, token: string) =>
@@ -445,6 +450,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
 
   while (!options.signal.aborted) {
     let opened = false;
+    let openedAt = 0;
     let closeCode = 0 as number;
     try {
       await new Promise<void>((resolve, reject) => {
@@ -464,7 +470,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
         options.signal.addEventListener("abort", abort, { once: true });
         socket.on("open", () => {
           opened = true;
-          backoff = min;
+          openedAt = Date.now();
           log.info("tunnel connected");
           options.onConnected?.(true);
           new TunnelSession(socket, target, log, dial, silenceTimeoutMs);
@@ -494,6 +500,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
       options.onDisplaced?.();
       return;
     }
+    if (opened && Date.now() - openedAt >= stableMs) backoff = min;
     await wait(backoff, options.signal);
     backoff = Math.min(backoff * 2, max);
   }
