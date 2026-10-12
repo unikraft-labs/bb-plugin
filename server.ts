@@ -25,6 +25,11 @@ import { runTunnel } from "./tunnel/mux";
 
 export const BASTION_CHANGED = "bastion-changed";
 
+export const DISPLACED_MESSAGE =
+  "Another bb server uses this bastion with the same token and took its tunnel. " +
+  "A bastion serves one bb server. Start a separate bastion for this server, " +
+  "or select Start bastion to take this one back.";
+
 const sandboxSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -190,7 +195,10 @@ export default async function plugin(bb: BbPluginApi) {
   let health: models.HealthResponseData | null = null;
   let healthError: string | null = null;
   let tunnelConnected = false;
+  let tunnelDisplaced = false;
   let restartTunnel: (() => void) | null = null;
+  // Wakes a displaced tunnel; only Start and settings changes call it.
+  let resumeTunnel: (() => void) | null = null;
 
   async function readBbVersion(): Promise<string> {
     if (bbVersion !== "") return bbVersion;
@@ -251,7 +259,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (!tunnelConnected) {
       return {
         kind: "unavailable",
-        message: "The plugin has no tunnel to the Unikraft Cloud bastion.",
+        message: tunnelDisplaced
+          ? DISPLACED_MESSAGE
+          : "The plugin has no tunnel to the Unikraft Cloud bastion.",
       };
     }
     return { kind: "ready" };
@@ -347,6 +357,7 @@ export default async function plugin(bb: BbPluginApi) {
     void (async () => {
       await reload();
       restartTunnel?.();
+      resumeTunnel?.();
       await refreshHealth();
       bb.experimental_serverAccess.recheck();
       publish();
@@ -376,6 +387,12 @@ export default async function plugin(bb: BbPluginApi) {
           },
           onConnected: (connected) => {
             tunnelConnected = connected;
+            if (connected) tunnelDisplaced = false;
+            bb.experimental_serverAccess.recheck();
+            publish();
+          },
+          onDisplaced: () => {
+            tunnelDisplaced = true;
             bb.experimental_serverAccess.recheck();
             publish();
           },
@@ -383,10 +400,29 @@ export default async function plugin(bb: BbPluginApi) {
         signal.removeEventListener("abort", stop);
         restartTunnel = null;
         tunnelConnected = false;
-        if (!signal.aborted) await wait(1_000, signal);
+        if (signal.aborted) break;
+        if (tunnelDisplaced) {
+          // Stay off the bastion until a settings change or Start bastion.
+          await untilRestarted(signal);
+          tunnelDisplaced = false;
+        } else {
+          await wait(1_000, signal);
+        }
       }
     },
   });
+
+  function untilRestarted(signal: AbortSignal): Promise<void> {
+    return new Promise((done) => {
+      const resume = () => {
+        resumeTunnel = null;
+        signal.removeEventListener("abort", resume);
+        done();
+      };
+      resumeTunnel = resume;
+      signal.addEventListener("abort", resume, { once: true });
+    });
+  }
 
   bb.background.schedule("refresh-bastion-health", "* * * * *", async () => {
     await reload();
@@ -402,6 +438,7 @@ export default async function plugin(bb: BbPluginApi) {
     });
     await rememberBastionUrl(result.url);
     restartTunnel?.();
+    resumeTunnel?.();
     await refreshHealth();
     bb.experimental_serverAccess.recheck();
     publish();
