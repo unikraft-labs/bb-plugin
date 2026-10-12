@@ -307,11 +307,37 @@ describe("runTunnel", () => {
       minBackoffMs: 10,
     });
     const first = await test.next();
-    first.close(4000, "replaced");
+    first.close(1011, "restarting");
     const second = await test.next();
     expect(second).not.toBe(first);
     controller.abort();
     await tunnel;
+  });
+
+  it("yields the tunnel to the client that replaced it", async () => {
+    const test = await harness("ok");
+    const controller = new AbortController();
+    let displaced = 0;
+    let connections = 0;
+    const tunnel = runTunnel({
+      bastionUrl: test.bastionUrl,
+      token: "tunnel-token",
+      loopbackBaseUrl: test.loopbackBaseUrl,
+      signal: controller.signal,
+      minBackoffMs: 10,
+      onConnected: (up) => {
+        if (up) connections += 1;
+      },
+      onDisplaced: () => {
+        displaced += 1;
+      },
+    });
+    const first = await test.next();
+    first.close(4000, "replaced");
+    await tunnel;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(displaced).toBe(1);
+    expect(connections).toBe(1);
   });
 
   it("gives up a tunnel that goes silent and reconnects", async () => {
