@@ -77,6 +77,9 @@ bb unikraft-cloud status
 `status` must show the bastion `ready` and the tunnel `connected`. The same
 information is on the settings section, with the list of sandboxes.
 
+One bastion serves one bb server. In external mode, give each bb server its
+own bastion URL and token.
+
 ## First thread
 
 Start a new thread and pick **Unikraft Cloud** in the environment picker. The
@@ -118,6 +121,7 @@ sandboxes** removes them and their filesystems.
 | The picker row says setup is required | A setting is missing; the message names it. |
 | The row says the bastion is not ready | The bastion is not started, or its health check fails. Run `bb unikraft-cloud status`. |
 | The row says there is no tunnel | The plugin cannot reach the bastion's `/v1/tunnel`. Check the bastion URL and token. |
+| The row says another bb server took the bastion's tunnel | Two bb servers use the same bastion URL and token, and a bastion serves one bb server. The server that lost the tunnel stops using it. Give each bb server its own bastion, or press **Start bastion** on the server that should keep this one. |
 | A thread starts but never comes online | The default machine access is not Unikraft Cloud, so the sandbox dials an address it cannot reach. |
 | A thread fails with a git error | The sandbox base image has no `git`. |
 | A thread has no agent CLI | The ROM's fallback CLI should cover it; check `bb plugin logs unikraft-cloud` and the sandbox ROM setting. |

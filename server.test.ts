@@ -2,9 +2,13 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { createFakePluginHost, type FakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, type WebSocket } from "ws";
 import { TUNNEL_SUBPROTOCOL } from "./tunnel/mux";
-import plugin, { type BastionStatus, type SandboxView } from "./server";
+import plugin, {
+  DISPLACED_MESSAGE,
+  type BastionStatus,
+  type SandboxView,
+} from "./server";
 
 const TOKEN = "bastion-token";
 
@@ -24,6 +28,7 @@ const SANDBOX = {
 interface Bastion {
   url: string;
   requests: string[];
+  tunnels: WebSocket[];
   stop: () => Promise<void>;
 }
 
@@ -92,11 +97,14 @@ async function startBastion(): Promise<Bastion> {
     handleProtocols: (protocols) =>
       protocols.has(TUNNEL_SUBPROTOCOL) ? TUNNEL_SUBPROTOCOL : false,
   });
+  const tunnels: WebSocket[] = [];
+  wss.on("connection", (socket) => tunnels.push(socket));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as AddressInfo).port;
   return {
     url: `http://127.0.0.1:${port}`,
     requests,
+    tunnels,
     stop: async () => {
       for (const socket of wss.clients) socket.terminate();
       wss.close();
@@ -531,5 +539,45 @@ describe("settings rpc", () => {
     await expect(
       harness.behavior.callRpc("settings.write", { listenPort: 0 }),
     ).rejects.toThrow();
+  });
+});
+
+describe("tunnel", () => {
+  async function statusUntil(
+    harness: FakePluginHost["harness"],
+    done: (status: BastionStatus) => boolean,
+  ): Promise<BastionStatus> {
+    const deadline = Date.now() + 5_000;
+    let status = (await harness.behavior.callRpc("bastion.status", null)) as BastionStatus;
+    while (!done(status) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      status = (await harness.behavior.callRpc("bastion.status", null)) as BastionStatus;
+    }
+    return status;
+  }
+
+  it("does not take the tunnel back from another bb server", async () => {
+    const { harness } = await load();
+    const service = harness.behavior.runService("tunnel");
+    expect((await statusUntil(harness, (s) => s.tunnelConnected)).tunnelConnected).toBe(true);
+
+    bastion.tunnels[0]?.close(4000, "replaced");
+    const displaced = await statusUntil(harness, (s) => s.message === DISPLACED_MESSAGE);
+    expect(displaced.tunnelConnected).toBe(false);
+    expect(displaced.message).toBe(DISPLACED_MESSAGE);
+
+    // Stop leaves it off too; wait past the 1 s reconnect delay.
+    await harness.behavior.callRpc("bastion.stop", null);
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    expect(bastion.tunnels).toHaveLength(1);
+
+    await harness.behavior.callRpc("bastion.start", null);
+    const back = await statusUntil(harness, (s) => s.tunnelConnected);
+    expect(back.tunnelConnected).toBe(true);
+    expect(back.message).toBeNull();
+    expect(bastion.tunnels).toHaveLength(2);
+
+    service.controller.abort();
+    await service.done;
   });
 });

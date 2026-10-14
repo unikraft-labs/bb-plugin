@@ -123,6 +123,12 @@ export const DEFAULT_SILENCE_TIMEOUT_MS = 45_000;
 /** How long the WebSocket upgrade may take before the attempt is abandoned. */
 export const DEFAULT_HANDSHAKE_TIMEOUT_MS = 15_000;
 
+/** Close code the bastion sends a tunnel it replaced. */
+export const REPLACED_CODE = 4000;
+
+/** Uptime after which a drop resets the reconnect backoff. */
+export const DEFAULT_STABLE_MS = 30_000;
+
 /**
  * How long a stopping tunnel waits for its close handshake before the socket
  * is torn down outright. A peer that is gone never answers the handshake.
@@ -390,7 +396,11 @@ export interface TunnelOptions {
   handshakeTimeoutMs?: number;
   /** How long a stop waits for the close handshake before terminating. */
   closeGraceMs?: number;
+  /** Uptime after which a drop resets the backoff. */
+  stableMs?: number;
   onConnected?: (connected: boolean) => void;
+  /** Another client took the tunnel; runTunnel returns. */
+  onDisplaced?: () => void;
   dial?: SocketFactory;
   createSocket?: (url: string, token: string) => WebSocket;
 }
@@ -429,6 +439,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
   const handshakeTimeoutMs =
     options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
   const closeGraceMs = options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS;
+  const stableMs = options.stableMs ?? DEFAULT_STABLE_MS;
   const create =
     options.createSocket ??
     ((url: string, token: string) =>
@@ -439,6 +450,8 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
 
   while (!options.signal.aborted) {
     let opened = false;
+    let openedAt = 0;
+    let closeCode = 0 as number;
     try {
       await new Promise<void>((resolve, reject) => {
         const socket = create(url, options.token);
@@ -457,7 +470,7 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
         options.signal.addEventListener("abort", abort, { once: true });
         socket.on("open", () => {
           opened = true;
-          backoff = min;
+          openedAt = Date.now();
           log.info("tunnel connected");
           options.onConnected?.(true);
           new TunnelSession(socket, target, log, dial, silenceTimeoutMs);
@@ -466,7 +479,8 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
           settle();
           reject(error);
         });
-        socket.on("close", () => {
+        socket.on("close", (code: number) => {
+          closeCode = code;
           settle();
           resolve();
         });
@@ -478,6 +492,15 @@ export async function runTunnel(options: TunnelOptions): Promise<void> {
     }
     if (opened) options.onConnected?.(false);
     if (options.signal.aborted) return;
+    // Replaced: another client holds the bastion, so do not take it back.
+    if (opened && closeCode === REPLACED_CODE) {
+      log.warn(
+        "another bb server took over this bastion's tunnel; not reconnecting",
+      );
+      options.onDisplaced?.();
+      return;
+    }
+    if (opened && Date.now() - openedAt >= stableMs) backoff = min;
     await wait(backoff, options.signal);
     backoff = Math.min(backoff * 2, max);
   }
