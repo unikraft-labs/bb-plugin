@@ -1,5 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
+import {
+  cliCommand,
+  defineCli,
+  defineRpcContract,
+  PluginCliError,
+  type BbPluginApi,
+} from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { BbBastionPluginApi } from "./bastion/api/index";
 import type { models } from "./bastion/api/api/index.gen";
@@ -247,7 +253,7 @@ export default async function plugin(bb: BbPluginApi) {
       return {
         kind: "setup-required",
         message:
-          "Start the Unikraft Cloud bastion in Settings → Plugins → Unikraft Cloud.",
+          "Start the Unikraft Cloud bastion in Settings → Plugins → Unikraft Cloud Sandbox.",
       };
     }
     if (health === null || !health.ready) {
@@ -560,17 +566,6 @@ export default async function plugin(bb: BbPluginApi) {
     "settings.write": (input) => writeSettings(input),
   });
 
-  const usage = [
-    "Usage:",
-    "  bb unikraft-cloud status [--json]",
-    "  bb unikraft-cloud start [--json]",
-    "  bb unikraft-cloud stop [--json]",
-    "  bb unikraft-cloud sandboxes [--json]",
-    "  bb unikraft-cloud sandbox <thread-id> [--json]",
-    "  bb unikraft-cloud delete-sandboxes [--json]",
-    "  bb unikraft-cloud warm [--force] [--json]",
-  ].join("\n");
-
   function formatStatus(view: BastionStatus): string {
     const lines = [
       `mode          ${view.mode}`,
@@ -609,122 +604,167 @@ export default async function plugin(bb: BbPluginApi) {
       .join("\n");
   }
 
-  bb.cli.register({
-    name: "unikraft-cloud",
-    summary: "Inspect and control the Unikraft Cloud bastion and its sandboxes",
-    commands: [
-      {
-        name: "status",
-        summary: "Show the bastion's configuration and health",
-        usage: "bb unikraft-cloud status [--json]",
+  const jsonOption = {
+    json: { type: "boolean", description: "Print the result as JSON" },
+  } as const;
+
+  function reply(json: boolean, value: unknown, text: string) {
+    return { exitCode: 0, stdout: json ? JSON.stringify(value) : text };
+  }
+
+  async function guarded<T>(run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (error instanceof PluginCliError) throw error;
+      throw new PluginCliError(describeError(error));
+    }
+  }
+
+  async function deleteEverySandbox(json: boolean) {
+    const deleted = await deleteAllSandboxes();
+    return reply(
+      json,
+      { deleted },
+      deleted.length === 0
+        ? "No sandboxes to delete."
+        : `Deleted ${deleted.length} sandbox(es).`,
+    );
+  }
+
+  bb.cli.register(
+    defineCli({
+      name: "unikraft-cloud",
+      summary: "Inspect and control the Unikraft Cloud bastion and its sandboxes",
+      commands: {
+        status: cliCommand({
+          summary: "Show the bastion's configuration and health",
+          options: jsonOption,
+          run: ({ options }) =>
+            guarded(async () => {
+              await refreshHealth();
+              const view = currentStatus();
+              return reply(options.json, view, formatStatus(view));
+            }),
+        }),
+        "bastion start": cliCommand({
+          summary: "Start the bastion",
+          aliases: ["start"],
+          options: jsonOption,
+          run: ({ options }) =>
+            guarded(async () => {
+              const result = await start();
+              return reply(
+                options.json,
+                result,
+                `Bastion ${result.created ? "created" : "reused"} at ${result.url}.`,
+              );
+            }),
+        }),
+        "bastion stop": cliCommand({
+          summary: "Stop the bastion, leaving sandboxes in standby",
+          aliases: ["stop"],
+          options: jsonOption,
+          run: ({ options }) =>
+            guarded(async () => {
+              const result = await stop();
+              return reply(
+                options.json,
+                result,
+                result.deleted ? "Bastion deleted." : "No bastion to delete.",
+              );
+            }),
+        }),
+        "sandbox list": cliCommand({
+          summary: "List the sandboxes the bastion manages",
+          aliases: ["sandboxes"],
+          options: jsonOption,
+          run: ({ options }) =>
+            guarded(async () => {
+              const sandboxes = await listSandboxes();
+              return reply(options.json, sandboxes, formatSandboxes(sandboxes));
+            }),
+        }),
+        "sandbox show": cliCommand({
+          summary: "Show the sandbox serving one thread",
+          options: jsonOption,
+          positionals: [
+            {
+              name: "thread-id",
+              description: "The thread the sandbox serves",
+              required: true,
+            },
+          ],
+          run: ({ options, positionals }) =>
+            guarded(async () => {
+              const threadId = positionals["thread-id"];
+              const sandbox = await readSandbox(threadId);
+              if (sandbox === null) {
+                throw new PluginCliError(`No sandbox serves thread ${threadId}.`);
+              }
+              const url = consoleUrl(sandbox.name);
+              return reply(
+                options.json,
+                { ...sandbox, consoleUrl: url },
+                url === null
+                  ? formatSandboxes([sandbox])
+                  : `${formatSandboxes([sandbox])}\n${url}`,
+              );
+            }),
+        }),
+        "sandbox delete-all": cliCommand({
+          summary: "Delete every sandbox and its filesystem",
+          options: {
+            ...jsonOption,
+            yes: {
+              type: "boolean",
+              description: "Confirm that every sandbox and its filesystem go",
+            },
+          },
+          run: ({ options }) =>
+            guarded(async () => {
+              if (!options.yes) {
+                throw new PluginCliError(
+                  "This deletes every sandbox and its filesystem, including the sandboxes of live threads, and you cannot undo it.",
+                  { hint: "Add --yes to confirm." },
+                );
+              }
+              return deleteEverySandbox(options.json);
+            }),
+        }),
+        // The old spelling never asked for --yes. It stays a hidden command
+        // without the check for one release, so scripts that call it keep
+        // working.
+        "delete-sandboxes": cliCommand({
+          summary: "Delete every sandbox and its filesystem",
+          hidden: true,
+          options: jsonOption,
+          run: ({ options }) =>
+            guarded(() => deleteEverySandbox(options.json)),
+        }),
+        "template warm": cliCommand({
+          summary: "Build the sandbox template ahead of the first thread",
+          aliases: ["warm"],
+          options: {
+            ...jsonOption,
+            force: {
+              type: "boolean",
+              description: "Build the template again, even when it is ready",
+            },
+          },
+          run: ({ options }) =>
+            guarded(async () => {
+              const template = await warmTemplate(options.force);
+              return reply(
+                options.json,
+                template,
+                `Template ${template.key} is ${template.state}.`,
+              );
+            }),
+        }),
       },
-      {
-        name: "start",
-        summary: "Start the bastion",
-        usage: "bb unikraft-cloud start [--json]",
-      },
-      {
-        name: "stop",
-        summary: "Stop the bastion, leaving sandboxes in standby",
-        usage: "bb unikraft-cloud stop [--json]",
-      },
-      {
-        name: "sandboxes",
-        summary: "List the sandboxes the bastion manages",
-        usage: "bb unikraft-cloud sandboxes [--json]",
-      },
-      {
-        name: "sandbox",
-        summary: "Show the sandbox serving one thread",
-        usage: "bb unikraft-cloud sandbox <thread-id> [--json]",
-      },
-      {
-        name: "delete-sandboxes",
-        summary: "Delete every sandbox",
-        usage: "bb unikraft-cloud delete-sandboxes [--json]",
-      },
-      {
-        name: "warm",
-        summary: "Build the sandbox template ahead of the first thread",
-        usage: "bb unikraft-cloud warm [--force] [--json]",
-      },
-    ],
-    async run(argv) {
-      const json = argv.includes("--json");
-      const force = argv.includes("--force");
-      const [command, argument] = argv.filter((arg) => !arg.startsWith("--"));
-      const reply = (value: unknown, text: string) => ({
-        exitCode: 0,
-        stdout: json ? JSON.stringify(value) : text,
-      });
-      try {
-        switch (command) {
-          case undefined:
-          case "help":
-            return { exitCode: 0, stdout: usage };
-          case "status": {
-            await refreshHealth();
-            const view = currentStatus();
-            return reply(view, formatStatus(view));
-          }
-          case "start": {
-            const result = await start();
-            return reply(
-              result,
-              `Bastion ${result.created ? "created" : "reused"} at ${result.url}.`,
-            );
-          }
-          case "stop": {
-            const result = await stop();
-            return reply(
-              result,
-              result.deleted ? "Bastion deleted." : "No bastion to delete.",
-            );
-          }
-          case "sandboxes": {
-            const sandboxes = await listSandboxes();
-            return reply(sandboxes, formatSandboxes(sandboxes));
-          }
-          case "sandbox": {
-            if (argument === undefined) return { exitCode: 1, stderr: usage };
-            const sandbox = await readSandbox(argument);
-            if (sandbox === null) {
-              return {
-                exitCode: 1,
-                stderr: `No sandbox serves thread ${argument}.`,
-              };
-            }
-            const url = consoleUrl(sandbox.name);
-            return reply(
-              { ...sandbox, consoleUrl: url },
-              url === null
-                ? formatSandboxes([sandbox])
-                : `${formatSandboxes([sandbox])}\n${url}`,
-            );
-          }
-          case "delete-sandboxes": {
-            const deleted = await deleteAllSandboxes();
-            return reply(
-              { deleted },
-              deleted.length === 0
-                ? "No sandboxes to delete."
-                : `Deleted ${deleted.length} sandbox(es).`,
-            );
-          }
-          case "warm": {
-            const template = await warmTemplate(force);
-            return reply(
-              template,
-              `Template ${template.key} is ${template.state}.`,
-            );
-          }
-        }
-      } catch (error) {
-        return { exitCode: 1, stderr: describeError(error) };
-      }
-      return { exitCode: 1, stderr: usage };
-    },
-  });
+    }),
+  );
 
   void refreshHealth().then(publish);
 
