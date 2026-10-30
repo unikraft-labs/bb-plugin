@@ -253,7 +253,7 @@ export default async function plugin(bb: BbPluginApi) {
       return {
         kind: "setup-required",
         message:
-          "Start the Unikraft Cloud bastion in Settings → Plugins → Unikraft Cloud.",
+          "Start the Unikraft Cloud bastion in Settings → Plugins → Unikraft Cloud Sandbox.",
       };
     }
     if (health === null || !health.ready) {
