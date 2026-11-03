@@ -10,10 +10,8 @@ import type {
   rpcContract,
   SandboxView,
   SettingsView,
-  SettingsWrite,
 } from "./server";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,14 +34,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -78,26 +68,6 @@ const MACHINE_PROVIDER_ID = "unikraft-cloud-sandbox";
 
 function message(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      {children}
-      {hint === undefined ? null : (
-        <span className="text-xs text-muted-foreground">{hint}</span>
-      )}
-    </label>
-  );
 }
 
 function Section({
@@ -267,51 +237,15 @@ function SandboxTable({
   );
 }
 
-type Drafts = Record<string, string>;
-
-function draftsFrom(view: SettingsView): Drafts {
-  return {
-    ukcMetro: view.ukcMetro,
-    ukcOrg: view.ukcOrg,
-    bastionUrl: view.bastionUrl,
-    bastionImage: view.bastionImage,
-    bastionVcpus: String(view.bastionVcpus),
-    bastionMemoryMb: String(view.bastionMemoryMb),
-    sandboxImage: view.sandboxImage,
-    sandboxRom: view.sandboxRom,
-    sandboxVcpus: String(view.sandboxVcpus),
-    sandboxMemoryMb: String(view.sandboxMemoryMb),
-    sandboxExtraEnv: view.sandboxExtraEnv,
-    sandboxPrepare: view.sandboxPrepare,
-    sandboxPrepareTimeout: view.sandboxPrepareTimeout,
-    sandboxCooldownMs: String(view.sandboxCooldownMs),
-    sandboxTtl: view.sandboxTtl,
-    listenPort: String(view.listenPort),
-    ukcToken: "",
-    bastionToken: "",
-  };
-}
-
 function UnikraftCloudSettings() {
   const rpc = useRpc<typeof rpcContract>();
   const [status, setStatus] = useState<BastionStatus | null>(null);
-  const [view, setView] = useState<SettingsView | null>(null);
-  const [drafts, setDrafts] = useState<Drafts>({});
-  const [mode, setMode] = useState("managed");
-  const [templateEnabled, setTemplateEnabled] = useState(true);
   const [sandboxes, setSandboxes] = useState<SandboxView[] | null>(null);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"stop" | "delete" | null>(null);
   const mounted = useRef(true);
-
-  const applyView = useCallback((next: SettingsView) => {
-    setView(next);
-    setDrafts(draftsFrom(next));
-    setMode(next.mode);
-    setTemplateEnabled(next.templateEnabled);
-  }, []);
 
   const refreshStatus = useCallback(() => {
     rpc.call("bastion.status").then(setStatus, (cause) => {
@@ -334,7 +268,6 @@ function UnikraftCloudSettings() {
 
   useEffect(() => {
     mounted.current = true;
-    rpc.call("settings.read").then(applyView, (cause) => setError(message(cause)));
     refreshStatus();
     refreshSandboxes();
     const timer = setInterval(() => {
@@ -345,16 +278,12 @@ function UnikraftCloudSettings() {
       mounted.current = false;
       clearInterval(timer);
     };
-  }, [rpc, applyView, refreshStatus, refreshSandboxes]);
+  }, [rpc, refreshStatus, refreshSandboxes]);
 
   useRealtime("bastion-changed", () => {
     refreshStatus();
     refreshSandboxes();
   });
-
-  const set = (key: string, value: string) => {
-    setDrafts((current) => ({ ...current, [key]: value }));
-  };
 
   const run = async (name: string, action: () => Promise<unknown>) => {
     setBusy(name);
@@ -369,48 +298,6 @@ function UnikraftCloudSettings() {
       if (mounted.current) setBusy(null);
     }
   };
-
-  const number = (key: string, fallback: number): number => {
-    const parsed = Number(drafts[key]);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
-
-  const save = () =>
-    run("save", async () => {
-      if (view === null) return;
-      const payload: SettingsWrite = {
-        mode: mode === "external" ? "external" : "managed",
-        ukcMetro: drafts.ukcMetro ?? "",
-        ukcOrg: drafts.ukcOrg ?? "",
-        bastionUrl: drafts.bastionUrl ?? "",
-        bastionImage: drafts.bastionImage ?? "",
-        bastionVcpus: number("bastionVcpus", view.bastionVcpus),
-        bastionMemoryMb: number("bastionMemoryMb", view.bastionMemoryMb),
-        sandboxImage: drafts.sandboxImage ?? "",
-        sandboxRom: drafts.sandboxRom ?? "",
-        sandboxVcpus: number("sandboxVcpus", view.sandboxVcpus),
-        sandboxMemoryMb: number("sandboxMemoryMb", view.sandboxMemoryMb),
-        sandboxExtraEnv: drafts.sandboxExtraEnv ?? "{}",
-        sandboxPrepare: drafts.sandboxPrepare ?? "",
-        sandboxPrepareTimeout:
-          drafts.sandboxPrepareTimeout ?? view.sandboxPrepareTimeout,
-        sandboxCooldownMs: number("sandboxCooldownMs", view.sandboxCooldownMs),
-        sandboxTtl: drafts.sandboxTtl ?? "",
-        templateEnabled,
-        listenPort: number("listenPort", view.listenPort),
-        ukcToken: drafts.ukcToken ?? "",
-        bastionToken: drafts.bastionToken ?? "",
-      };
-      applyView(await rpc.call("settings.write", payload));
-    });
-
-  const clearSecret = (key: "ukcToken" | "bastionToken") =>
-    run(key, async () => {
-      applyView(await rpc.call("settings.write", { [key]: null }));
-    });
-
-  const secretState = (has: boolean) =>
-    has ? "Stored. Type a new value to replace it." : "Not set.";
 
   return (
     <div className="space-y-6">
@@ -455,204 +342,6 @@ function UnikraftCloudSettings() {
             {error}
           </p>
         )}
-      </Section>
-
-      <Section title="Credentials">
-        <Field label="Mode" hint="Managed creates the bastion for you.">
-          <Select value={mode} onValueChange={setMode}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="managed">Managed</SelectItem>
-              <SelectItem value="external">External</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field
-          label="Unikraft Cloud token"
-          hint={secretState(view?.hasUkcToken ?? false)}
-        >
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              value={drafts.ukcToken ?? ""}
-              placeholder="Replace the stored value"
-              onChange={(event) => set("ukcToken", event.target.value)}
-            />
-            <Button
-              variant="outline"
-              onClick={() => clearSecret("ukcToken")}
-              disabled={busy !== null}
-            >
-              Clear
-            </Button>
-          </div>
-        </Field>
-        <Field label="Metro" hint="For example fra.">
-          <Input
-            value={drafts.ukcMetro ?? ""}
-            onChange={(event) => set("ukcMetro", event.target.value)}
-          />
-        </Field>
-        <Field
-          label="Organisation"
-          hint="Names the organisation in console links. Managed mode reads it from the token."
-        >
-          <Input
-            value={drafts.ukcOrg ?? ""}
-            onChange={(event) => set("ukcOrg", event.target.value)}
-          />
-        </Field>
-        <Field
-          label="Bastion URL"
-          hint="Managed mode fills this in when the bastion starts."
-        >
-          <Input
-            value={drafts.bastionUrl ?? ""}
-            onChange={(event) => set("bastionUrl", event.target.value)}
-          />
-        </Field>
-        <Field
-          label="Bastion token"
-          hint={secretState(view?.hasBastionToken ?? false)}
-        >
-          <div className="flex gap-2">
-            <Input
-              type="password"
-              value={drafts.bastionToken ?? ""}
-              placeholder="Replace the stored value"
-              onChange={(event) => set("bastionToken", event.target.value)}
-            />
-            <Button
-              variant="outline"
-              onClick={() => clearSecret("bastionToken")}
-              disabled={busy !== null}
-            >
-              Clear
-            </Button>
-          </div>
-        </Field>
-      </Section>
-
-      <Section title="Sandboxes">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Base image" hint="The image must contain git.">
-            <Input
-              value={drafts.sandboxImage ?? ""}
-              onChange={(event) => set("sandboxImage", event.target.value)}
-            />
-          </Field>
-          <Field label="ROM" hint="Empty selects the ROM for this bb version.">
-            <Input
-              value={drafts.sandboxRom ?? ""}
-              onChange={(event) => set("sandboxRom", event.target.value)}
-            />
-          </Field>
-          <Field label="vCPUs">
-            <Input
-              type="number"
-              min={1}
-              value={drafts.sandboxVcpus ?? ""}
-              onChange={(event) => set("sandboxVcpus", event.target.value)}
-            />
-          </Field>
-          <Field label="Memory (MiB)">
-            <Input
-              type="number"
-              min={256}
-              value={drafts.sandboxMemoryMb ?? ""}
-              onChange={(event) => set("sandboxMemoryMb", event.target.value)}
-            />
-          </Field>
-          <Field label="Scale-to-zero cooldown (ms)">
-            <Input
-              type="number"
-              min={0}
-              value={drafts.sandboxCooldownMs ?? ""}
-              onChange={(event) => set("sandboxCooldownMs", event.target.value)}
-            />
-          </Field>
-          <Field label="Lifetime" hint="A Go duration, such as 168h.">
-            <Input
-              value={drafts.sandboxTtl ?? ""}
-              onChange={(event) => set("sandboxTtl", event.target.value)}
-            />
-          </Field>
-          <Field label="Listen port">
-            <Input
-              type="number"
-              min={1}
-              max={65535}
-              value={drafts.listenPort ?? ""}
-              onChange={(event) => set("listenPort", event.target.value)}
-            />
-          </Field>
-          <Field label="Bastion image">
-            <Input
-              value={drafts.bastionImage ?? ""}
-              onChange={(event) => set("bastionImage", event.target.value)}
-            />
-          </Field>
-          <Field label="Bastion vCPUs">
-            <Input
-              type="number"
-              min={1}
-              value={drafts.bastionVcpus ?? ""}
-              onChange={(event) => set("bastionVcpus", event.target.value)}
-            />
-          </Field>
-          <Field label="Bastion memory (MiB)">
-            <Input
-              type="number"
-              min={128}
-              value={drafts.bastionMemoryMb ?? ""}
-              onChange={(event) => set("bastionMemoryMb", event.target.value)}
-            />
-          </Field>
-        </div>
-        <Field
-          label="Sandbox environment"
-          hint="A JSON object added to every sandbox."
-        >
-          <Textarea
-            className="min-h-24 font-mono text-xs"
-            value={drafts.sandboxExtraEnv ?? ""}
-            onChange={(event) => set("sandboxExtraEnv", event.target.value)}
-          />
-        </Field>
-        <Field
-          label="Sandbox prepare commands"
-          hint="One shell command per line, run once in the template seed or a new sandbox. Agent CLIs belong here."
-        >
-          <Textarea
-            className="min-h-24 font-mono text-xs"
-            value={drafts.sandboxPrepare ?? ""}
-            onChange={(event) => set("sandboxPrepare", event.target.value)}
-          />
-        </Field>
-        <div className="max-w-40">
-          <Field label="Prepare timeout" hint="A Go duration, such as 5m.">
-            <Input
-              value={drafts.sandboxPrepareTimeout ?? ""}
-              onChange={(event) =>
-                set("sandboxPrepareTimeout", event.target.value)
-              }
-            />
-          </Field>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <Checkbox
-            checked={templateEnabled}
-            onCheckedChange={(checked) => setTemplateEnabled(checked === true)}
-          />
-          Warm a sandbox template
-        </label>
-        <div>
-          <Button onClick={save} disabled={busy !== null || view === null}>
-            Save settings
-          </Button>
-        </div>
       </Section>
 
       <Section title="Running sandboxes">

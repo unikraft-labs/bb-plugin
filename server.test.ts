@@ -171,7 +171,6 @@ describe("plugin registration", () => {
       "sandboxes.get",
       "sandboxes.list",
       "settings.read",
-      "settings.write",
       "template.warm",
     ]);
     expect(registrations.cli?.name).toBe("unikraft-cloud");
@@ -520,24 +519,29 @@ describe("settings rpc", () => {
     expect(Object.keys(view)).not.toContain("bastionToken");
   });
 
-  it("writes values and keeps an empty secret unchanged", async () => {
+  it("makes a bastion token when a host form save switches to managed mode", async () => {
     const { harness } = await load();
-    const view = (await harness.behavior.callRpc("settings.write", {
-      sandboxVcpus: 4,
-      sandboxImage: "ubuntu:latest",
-      bastionToken: "",
-    })) as Record<string, unknown>;
-    expect(view).toMatchObject({
-      sandboxVcpus: 4,
-      sandboxImage: "ubuntu:latest",
-      hasBastionToken: true,
+    const signals = harness.inspection.realtimeSignals.length;
+    await harness.behavior.setSettings({
+      mode: "managed",
+      bastionToken: null,
+      ukcToken: "ukc-token",
+      ukcMetro: "fra",
     });
+    await expect
+      .poll(() => harness.inspection.realtimeSignals.length)
+      .toBeGreaterThan(signals);
+    const view = (await harness.behavior.callRpc(
+      "settings.read",
+      null,
+    )) as Record<string, unknown>;
+    expect(view.hasBastionToken).toBe(true);
   });
 
   it("refuses a value the descriptor does not allow", async () => {
     const { harness } = await load();
     await expect(
-      harness.behavior.callRpc("settings.write", { listenPort: 0 }),
+      harness.behavior.setSettings({ listenPort: 0 }),
     ).rejects.toThrow();
   });
 });

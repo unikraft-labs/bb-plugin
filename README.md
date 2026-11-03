@@ -54,8 +54,9 @@ Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
 | Warm a sandbox template | on | Builds a template so the first thread starts fast. |
 | Sandbox listen port | 7443 | The loopback port a sandbox's daemon dials. |
 
-Secret fields are write-only: they show whether a value is stored, take a new
-one, and have a Clear button. A setting change reloads the plugin.
+bb shows these settings as a form on the plugin page. Secret fields are
+write-only. A setting change reloads the plugin. In managed mode, if the bastion
+token is empty, the plugin makes a new one.
 
 ## Choose Unikraft Cloud as the default machine access
 
