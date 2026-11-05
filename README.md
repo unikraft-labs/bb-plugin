@@ -101,14 +101,15 @@ as the platform requires, on the public port of the same number:
 `https://<generated>.<metro>.unikraft.app:8080`.
 
 A sandbox that publishes a port carries a menu beside its state pill in the
-thread header, listing every published port as `<hostname>:<port>`. Each one
-opens over HTTPS.
+context row above the composer. The menu lists every published port as
+`<hostname>:<port>`. Each one opens over HTTPS.
 
 The thread's machine is named after its sandbox instance, so bb's machine line
 under the input reads `Unikraft Cloud (bbx-…)`, with the name linked to the
 instance in the Unikraft Cloud console once the organisation is known. The
-thread header carries a pill with the sandbox's state. `bb unikraft-cloud
-sandbox <thread-id>` prints the same state and link on the command line.
+context row above the composer carries a pill with the sandbox's state.
+`bb unikraft-cloud sandbox <thread-id>` prints the same state and link on the
+command line.
 
 bb owns the sandbox from there: archiving or deleting the thread deletes its
 sandbox. Stopping the bastion leaves sandboxes in standby; **Delete all
