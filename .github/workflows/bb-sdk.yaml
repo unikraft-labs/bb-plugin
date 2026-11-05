@@ -38,5 +38,5 @@ jobs:
           echo "version=${sdk}" >> "$GITHUB_OUTPUT"
 
       - run: nub install --frozen-lockfile
-      - run: nub add -D "@get-bb/plugin-sdk@${{ steps.sdk.outputs.version }}"
+      - run: nub add -D -E "@get-bb/plugin-sdk@${{ steps.sdk.outputs.version }}"
       - run: nub run typecheck
