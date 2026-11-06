@@ -9,7 +9,7 @@
     "bbPluginSdk": ">=0.4.87"
   },
   "bb": {
-    "name": "Unikraft Cloud",
+    "name": "Unikraft Cloud Sandbox",
     "description": "Run bb threads in Unikraft Cloud sandboxes that scale to zero",
     "branding": {
       "icon": "Cloud"

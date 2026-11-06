@@ -2,10 +2,10 @@
 
 Run bb threads in Unikraft Cloud sandboxes that scale to zero.
 
-The plugin adds one row, **Unikraft Cloud**, to bb's new-thread environment
-picker. Every thread started there gets its own Unikraft Cloud microVM — a
-*sandbox* — with the project checked out on it. Between turns the sandbox
-freezes and costs nothing; the next message wakes it.
+The plugin adds one row, **Unikraft Cloud Sandbox**, to bb's new-thread
+environment picker. Every thread started there gets its own Unikraft
+Cloud microVM — a *sandbox* — with the project checked out on it. Between
+turns the sandbox freezes and costs nothing; the next message wakes it.
 
 The plugin never talks to a sandbox directly. It talks to the **bastion**, a
 service on Unikraft Cloud that owns sandbox lifecycle and sits between each
@@ -31,7 +31,8 @@ bb plugin install .
 
 ## Settings
 
-Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
+Settings → Plugins → Unikraft Cloud Sandbox, or
+`bb plugin config unikraft-cloud`.
 
 | Setting | Default | Notes |
 | --- | --- | --- |
@@ -70,7 +71,7 @@ cannot reach and the thread never comes online.
 From the settings section press **Start bastion**, or:
 
 ```sh
-bb unikraft-cloud start
+bb unikraft-cloud bastion start
 bb unikraft-cloud status
 ```
 
@@ -82,9 +83,9 @@ own bastion URL and token.
 
 ## First thread
 
-Start a new thread and pick **Unikraft Cloud** in the environment picker. The
-cog next to the row opens the sandbox options, which apply to that thread
-only; every field left empty keeps the configured default.
+Start a new thread and pick **Unikraft Cloud Sandbox** in the environment
+picker. The cog next to the row opens the sandbox options, which apply to that
+thread only; every field left empty keeps the configured default.
 
 | Option | Effect |
 | --- | --- |
@@ -95,8 +96,8 @@ only; every field left empty keeps the configured default.
 An exposed port gives the sandbox a Unikraft Cloud service group and, with it,
 a public hostname. Unikraft Cloud generates that hostname and it does not
 follow from the sandbox's name, so read it from the settings section or from
-`bb unikraft-cloud sandbox <thread-id>`, which print one URL per port once the
-sandbox exists. Port 80 is served over HTTP and every other port over HTTPS,
+`bb unikraft-cloud sandbox show <thread-id>`, which print one URL per port once
+the sandbox exists. Port 80 is served over HTTP and every other port over HTTPS,
 as the platform requires, on the public port of the same number:
 `https://<generated>.<metro>.unikraft.app:8080`.
 
@@ -108,7 +109,7 @@ The thread's machine is named after its sandbox instance, so bb's machine line
 under the input reads `Unikraft Cloud (bbx-…)`, with the name linked to the
 instance in the Unikraft Cloud console once the organisation is known. The
 thread header carries a pill with the sandbox's state. `bb unikraft-cloud
-sandbox <thread-id>` prints the same state and link on the command line.
+sandbox show <thread-id>` prints the same state and link on the command line.
 
 bb owns the sandbox from there: archiving or deleting the thread deletes its
 sandbox. Stopping the bastion leaves sandboxes in standby; **Delete all

@@ -2,7 +2,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 
 export const MACHINE_PROVIDER_ID = "unikraft-cloud-sandbox";
 export const ENVIRONMENT_PROVIDER_ID = "unikraft-cloud-sandbox";
-export const PROVIDER_DISPLAY_NAME = "Unikraft Cloud";
+export const PROVIDER_DISPLAY_NAME = "Unikraft Cloud Sandbox";
 export const PROVIDER_ICON = "Cloud";
 
 export function registerEnvironment(bb: BbPluginApi): void {
