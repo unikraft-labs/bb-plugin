@@ -1,4 +1,5 @@
 import type { PluginSettingDescriptor } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 
 export const SETTING_DESCRIPTORS = {
   mode: {
@@ -48,11 +49,13 @@ export const SETTING_DESCRIPTORS = {
     type: "number",
     label: "Bastion vCPUs",
     default: 1,
+    experimental_schema: z.number().int().min(1),
   },
   bastionMemoryMb: {
     type: "number",
     label: "Bastion memory (MiB)",
     default: 1024,
+    experimental_schema: z.number().int().min(128),
   },
   sandboxImage: {
     type: "string",
@@ -70,11 +73,13 @@ export const SETTING_DESCRIPTORS = {
     type: "number",
     label: "Sandbox vCPUs",
     default: 1,
+    experimental_schema: z.number().int().min(1),
   },
   sandboxMemoryMb: {
     type: "number",
     label: "Sandbox memory (MiB)",
     default: 4096,
+    experimental_schema: z.number().int().min(256),
   },
   sandboxExtraEnv: {
     type: "string",
@@ -102,6 +107,7 @@ export const SETTING_DESCRIPTORS = {
     type: "number",
     label: "Scale-to-zero cooldown (ms)",
     default: 5000,
+    experimental_schema: z.number().int().min(0),
   },
   sandboxTtl: {
     type: "string",
@@ -120,6 +126,7 @@ export const SETTING_DESCRIPTORS = {
     label: "Sandbox listen port",
     description: "The loopback port each sandbox's daemon dials inside its microVM.",
     default: 7443,
+    experimental_schema: z.number().int().min(1).max(65_535),
   },
 } satisfies Record<string, PluginSettingDescriptor>;
 

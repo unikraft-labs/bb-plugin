@@ -22,6 +22,7 @@ import {
   resolve,
   SETTING_DESCRIPTORS,
   type ResolvedSettings,
+  type SettingValues,
 } from "./configuration";
 import { registerEnvironment } from "./providers/environment";
 import { isNotFound, registerMachine } from "./providers/machine";
@@ -100,30 +101,6 @@ const settingsViewSchema = z.object({
 });
 export type SettingsView = z.infer<typeof settingsViewSchema>;
 
-const settingsWriteSchema = z.object({
-  mode: z.enum(["managed", "external"]).optional(),
-  ukcToken: z.string().nullable().optional(),
-  ukcMetro: z.string().optional(),
-  ukcOrg: z.string().optional(),
-  bastionUrl: z.string().optional(),
-  bastionToken: z.string().nullable().optional(),
-  bastionImage: z.string().optional(),
-  bastionVcpus: z.number().int().min(1).optional(),
-  bastionMemoryMb: z.number().int().min(128).optional(),
-  sandboxImage: z.string().optional(),
-  sandboxRom: z.string().optional(),
-  sandboxVcpus: z.number().int().min(1).optional(),
-  sandboxMemoryMb: z.number().int().min(256).optional(),
-  sandboxExtraEnv: z.string().optional(),
-  sandboxPrepare: z.string().optional(),
-  sandboxPrepareTimeout: z.string().optional(),
-  sandboxCooldownMs: z.number().int().min(0).optional(),
-  sandboxTtl: z.string().optional(),
-  templateEnabled: z.boolean().optional(),
-  listenPort: z.number().int().min(1).max(65_535).optional(),
-});
-export type SettingsWrite = z.infer<typeof settingsWriteSchema>;
-
 export const rpcContract = defineRpcContract({
   "bastion.status": { input: z.null(), output: statusSchema },
   "bastion.start": {
@@ -154,7 +131,6 @@ export const rpcContract = defineRpcContract({
     output: templateSchema,
   },
   "settings.read": { input: z.null(), output: settingsViewSchema },
-  "settings.write": { input: settingsWriteSchema, output: settingsViewSchema },
 });
 
 function toSandboxView(sandbox: models.SandboxResponseData): SandboxView {
@@ -216,10 +192,13 @@ export default async function plugin(bb: BbPluginApi) {
     return bbVersion;
   }
 
-  async function ensureBastionToken(): Promise<void> {
-    const values = await settings.get();
-    if ((values.bastionToken ?? "").trim() !== "") return;
-    if (values.mode === "external") return;
+  function lacksBastionToken(
+    values: Pick<SettingValues, "mode" | "bastionToken">,
+  ): boolean {
+    return values.mode !== "external" && (values.bastionToken ?? "").trim() === "";
+  }
+
+  async function createBastionToken(): Promise<void> {
     await settings.experimental_set({
       bastionToken: randomBytes(32).toString("base64url"),
     });
@@ -342,7 +321,7 @@ export default async function plugin(bb: BbPluginApi) {
     };
   }
 
-  await ensureBastionToken();
+  if (lacksBastionToken(await settings.get())) await createBastionToken();
   await reload();
 
   registerEnvironment(bb);
@@ -359,7 +338,12 @@ export default async function plugin(bb: BbPluginApi) {
     listenPort: () => resolved?.listenPort ?? null,
   });
 
-  settings.onChange(() => {
+  settings.onChange((next) => {
+    // The token write fires onChange again, and that call does the reload.
+    if (lacksBastionToken(next)) {
+      void createBastionToken();
+      return;
+    }
     void (async () => {
       await reload();
       restartTunnel?.();
@@ -525,26 +509,6 @@ export default async function plugin(bb: BbPluginApi) {
     };
   }
 
-  async function writeSettings(input: SettingsWrite): Promise<SettingsView> {
-    const update: Record<string, string | number | boolean | null> = {};
-    for (const [key, value] of Object.entries(input)) {
-      if (value === undefined) continue;
-      if ((key === "ukcToken" || key === "bastionToken") && value === "") {
-        continue;
-      }
-      update[key] = value;
-    }
-    if (Object.keys(update).length > 0) {
-      await settings.experimental_set(update);
-    }
-    await ensureBastionToken();
-    await reload();
-    await refreshHealth();
-    bb.experimental_serverAccess.recheck();
-    publish();
-    return readSettings();
-  }
-
   bb.rpc.register(rpcContract, {
     "bastion.status": async () => {
       await refreshHealth();
@@ -563,7 +527,6 @@ export default async function plugin(bb: BbPluginApi) {
     "sandboxes.deleteAll": async () => ({ deleted: await deleteAllSandboxes() }),
     "template.warm": ({ force }) => warmTemplate(force ?? false),
     "settings.read": () => readSettings(),
-    "settings.write": (input) => writeSettings(input),
   });
 
   function formatStatus(view: BastionStatus): string {
