@@ -1,0 +1,33 @@
+name: check
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    name: Typecheck, test, and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: nubjs/setup-nub@v0.6.0
+        with:
+          node-version: 22
+
+      - run: nub install --frozen-lockfile
+      - run: nub run typecheck
+      - run: nub run test
+
+      # `bb plugin build` needs no server, only the CLI of a bb release.
+      - name: Install the bb CLI
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir bb && cd bb
+          echo '{"name":"bb-cli","private":true}' > package.json
+          nub add bb-app@latest
+
+      - run: ${{ runner.temp }}/bb/node_modules/.bin/bb plugin build .

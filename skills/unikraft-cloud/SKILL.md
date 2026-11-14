@@ -5,26 +5,28 @@ description: Inspect and control the Unikraft Cloud bastion and the per-thread s
 
 # Unikraft Cloud
 
-Threads started on the **Unikraft Cloud** environment row each run in their own
-Unikraft Cloud microVM — a *sandbox* — that scales to zero between turns. A
-service called the *bastion* owns those sandboxes and relays their traffic to
-this bb server. The `bb unikraft-cloud` command is the same surface as the
-plugin's settings section: everything below can be done from either.
+Threads started on the **Unikraft Cloud Sandbox** environment row each run in
+their own Unikraft Cloud microVM — a *sandbox* — that scales to zero between
+turns. A service called the *bastion* owns those sandboxes and relays their
+traffic to this bb server. The `bb unikraft-cloud` command is the same surface
+as the plugin's settings section: everything below can be done from either.
 
 ## Commands
 
 | Command | Effect |
 | --- | --- |
 | `bb unikraft-cloud status` | Configuration, bastion health, tunnel state, sandbox counts. |
-| `bb unikraft-cloud start` | Create the bastion (managed mode) or wait for it (external mode), then warm the sandbox template. |
-| `bb unikraft-cloud stop` | Delete the bastion. Sandboxes stay in standby. |
-| `bb unikraft-cloud sandboxes` | List every sandbox with its state, size and the URL of every port it publishes. |
-| `bb unikraft-cloud sandbox <thread-id>` | Show the state, size and published URLs of the sandbox serving one thread, and its console link. bb's machine line under the input names the same sandbox and its state sits in the thread header. |
-| `bb unikraft-cloud delete-sandboxes` | Delete every sandbox and its filesystem. |
-| `bb unikraft-cloud warm [--force]` | Build the sandbox template ahead of the first thread. |
+| `bb unikraft-cloud bastion start` | Create the bastion (managed mode) or wait for it (external mode). The bastion builds the sandbox template when it starts. |
+| `bb unikraft-cloud bastion stop` | Delete the bastion. Sandboxes stay in standby. |
+| `bb unikraft-cloud sandbox list` | List every sandbox with its state, size and the URL of every port it publishes. |
+| `bb unikraft-cloud sandbox show <thread-id>` | Show the state, size and published URLs of the sandbox serving one thread, and its console link. bb's machine line under the input names the same sandbox and its state sits in the thread header. |
+| `bb unikraft-cloud sandbox delete-all --yes` | Delete every sandbox and its filesystem. Without `--yes`, the command deletes nothing and exits with 1. |
+| `bb unikraft-cloud template warm [--force]` | Ask the bastion to build the sandbox template ahead of the first thread. The command returns at once with the template state, and the build continues in the background; read it with `status`. `--force` builds the template again. |
 
 Every command accepts `--json` and prints one JSON value on stdout, which is
-what to use when the output is going to be parsed.
+what to use when the output is going to be parsed. When a command fails, that
+value is `{ "ok": false, "error": { "code", "message", "hint" } }`.
+`bb unikraft-cloud <command> --help` lists the options of a command.
 
 ## Reading the status
 
@@ -33,7 +35,8 @@ bb unikraft-cloud status
 ```
 
 - `configured` lists the settings that are still missing. Settings live in
-  Settings → Plugins → Unikraft Cloud, or `bb plugin config unikraft-cloud`.
+  Settings → Plugins → Unikraft Cloud Sandbox, or
+  `bb plugin config unikraft-cloud`.
 - `bastion` is empty until the bastion has been started.
 - `org` is the organisation console links point at, read from the Unikraft
   Cloud token unless the Organisation setting names one.
@@ -55,8 +58,8 @@ than once in the template.
 
 ## Per-thread sandbox options
 
-The cog beside the **Unikraft Cloud** row in the new-thread environment picker
-sets the sandbox options of that thread alone; an empty field keeps the
+The cog beside the **Unikraft Cloud Sandbox** row in the new-thread environment
+picker sets the sandbox options of that thread alone; an empty field keeps the
 configured default. They are persisted with the thread's machine selection, as
 JSON:
 
@@ -83,15 +86,15 @@ they cannot be changed afterwards without a new thread.
    and token (external mode).
 2. In Settings → Machines, choose **Unikraft Cloud** as the default machine
    access so enrolled sandboxes are told how to reach this server.
-3. `bb unikraft-cloud start`.
-4. Start a thread on the **Unikraft Cloud** row.
+3. `bb unikraft-cloud bastion start`.
+4. Start a thread on the **Unikraft Cloud Sandbox** row.
 
 ## Cautions
 
-- `stop` deletes the bastion instance only. Threads whose sandboxes are in
-  standby cannot run until it is started again.
-- `delete-sandboxes` is destructive and irreversible: it deletes the
+- `bastion stop` deletes the bastion instance only. Threads whose sandboxes are
+  in standby cannot run until it is started again.
+- `sandbox delete-all` is destructive and irreversible: it deletes the
   filesystem of every sandbox, including ones with live threads. Ask before
-  running it.
+  you run it with `--yes`.
 - Deleting a single sandbox is bb's job, not this command's: archive or delete
   the thread and bb removes its machine.

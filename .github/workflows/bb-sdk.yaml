@@ -1,0 +1,42 @@
+name: bb-sdk
+permissions:
+  contents: read
+
+# bb gives a plugin the SDK at runtime, so the pinned `@get-bb/plugin-sdk`
+# only types the code. This typechecks against the SDK version the latest
+# bb release ships, which npm has newer versions than, so that a release
+# that changes the SDK surface is known before a user's bb loads the plugin.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    name: Typecheck against the SDK of the latest bb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: nubjs/setup-nub@v0.6.0
+        with:
+          node-version: 22
+
+      - name: Read the SDK version the latest bb ships
+        id: sdk
+        run: |
+          version=$(curl -fsS https://registry.npmjs.org/-/package/bb-app/dist-tags \
+            | jq -r .latest)
+          tarball=$(curl -fsS "https://registry.npmjs.org/bb-app/${version}" \
+            | jq -r .dist.tarball)
+          sdk=$(curl -fsSL "$tarball" \
+            | tar -xzO package/server/dist/start-server.js \
+            | grep -oE 'PLUGIN_SDK_VERSION = "[^"]+"' \
+            | head -1 | cut -d'"' -f2)
+          test -n "$sdk"
+          echo "bb ${version} ships @get-bb/plugin-sdk ${sdk}"
+          echo "version=${sdk}" >> "$GITHUB_OUTPUT"
+
+      - run: nub install --frozen-lockfile
+      - run: nub add -D -E "@get-bb/plugin-sdk@${{ steps.sdk.outputs.version }}"
+      - run: nub run typecheck

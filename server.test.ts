@@ -171,7 +171,6 @@ describe("plugin registration", () => {
       "sandboxes.get",
       "sandboxes.list",
       "settings.read",
-      "settings.write",
       "template.warm",
     ]);
     expect(registrations.cli?.name).toBe("unikraft-cloud");
@@ -335,22 +334,59 @@ describe("cli", () => {
 
   it("mirrors the sandbox list", async () => {
     const { harness } = await load();
-    const result = await harness.behavior.runCli(["sandboxes"]);
+    const result = await harness.behavior.runCli(["sandbox", "list"]);
     expect(result.stdout).toContain("bbx-thread-1");
   });
 
   it("mirrors one thread's sandbox", async () => {
     const { harness } = await load();
-    const result = await harness.behavior.runCli(["sandbox", "thread-1"]);
+    const result = await harness.behavior.runCli([
+      "sandbox",
+      "show",
+      "thread-1",
+    ]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("running");
   });
 
   it("reports a thread without a sandbox", async () => {
     const { harness } = await load();
-    const result = await harness.behavior.runCli(["sandbox", "thread-2"]);
+    const result = await harness.behavior.runCli([
+      "sandbox",
+      "show",
+      "thread-2",
+    ]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("thread-2");
+  });
+
+  it("deletes every sandbox only with --yes", async () => {
+    const { harness } = await load();
+    const refused = await harness.behavior.runCli(["sandbox", "delete-all"]);
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr).toContain("--yes");
+    expect(bastion.requests).not.toContain("DELETE /v1/sandboxes");
+
+    const confirmed = await harness.behavior.runCli([
+      "sandbox",
+      "delete-all",
+      "--yes",
+    ]);
+    expect(confirmed.exitCode).toBe(0);
+    expect(bastion.requests).toContain("DELETE /v1/sandboxes");
+  });
+
+  it.each([
+    [["start"], ["bastion", "start"]],
+    [["stop"], ["bastion", "stop"]],
+    [["sandboxes"], ["sandbox", "list"]],
+    [["delete-sandboxes"], ["sandbox", "delete-all", "--yes"]],
+    [["warm"], ["template", "warm"]],
+  ])("still answers the deprecated %j", async (deprecated, current) => {
+    const { harness } = await load();
+    const answer = await harness.behavior.runCli(deprecated);
+    expect(answer.exitCode).toBe(0);
+    expect(answer).toEqual(await harness.behavior.runCli(current));
   });
 
   it("prints usage without a command", async () => {
@@ -362,7 +398,7 @@ describe("cli", () => {
 
   it("reports a failure on stderr", async () => {
     const { harness } = await load({ mode: "external" });
-    const result = await harness.behavior.runCli(["sandboxes"]);
+    const result = await harness.behavior.runCli(["sandbox", "list"]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("Bastion URL");
   });
@@ -520,24 +556,29 @@ describe("settings rpc", () => {
     expect(Object.keys(view)).not.toContain("bastionToken");
   });
 
-  it("writes values and keeps an empty secret unchanged", async () => {
+  it("makes a bastion token when a host form save switches to managed mode", async () => {
     const { harness } = await load();
-    const view = (await harness.behavior.callRpc("settings.write", {
-      sandboxVcpus: 4,
-      sandboxImage: "ubuntu:latest",
-      bastionToken: "",
-    })) as Record<string, unknown>;
-    expect(view).toMatchObject({
-      sandboxVcpus: 4,
-      sandboxImage: "ubuntu:latest",
-      hasBastionToken: true,
+    const signals = harness.inspection.realtimeSignals.length;
+    await harness.behavior.setSettings({
+      mode: "managed",
+      bastionToken: null,
+      ukcToken: "ukc-token",
+      ukcMetro: "fra",
     });
+    await expect
+      .poll(() => harness.inspection.realtimeSignals.length)
+      .toBeGreaterThan(signals);
+    const view = (await harness.behavior.callRpc(
+      "settings.read",
+      null,
+    )) as Record<string, unknown>;
+    expect(view.hasBastionToken).toBe(true);
   });
 
   it("refuses a value the descriptor does not allow", async () => {
     const { harness } = await load();
     await expect(
-      harness.behavior.callRpc("settings.write", { listenPort: 0 }),
+      harness.behavior.setSettings({ listenPort: 0 }),
     ).rejects.toThrow();
   });
 });
