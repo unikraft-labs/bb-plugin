@@ -43,7 +43,7 @@ export const SETTING_DESCRIPTORS = {
   bastionImage: {
     type: "string",
     label: "Bastion image",
-    default: "index.unikraft.io/unikraft/bb-bastion:latest",
+    default: "index.unikraft.io/plugins/bb-bastion:latest",
   },
   bastionVcpus: {
     type: "number",
@@ -188,7 +188,7 @@ export interface MissingSettings {
 
 export type ResolveResult = ResolvedSettings | MissingSettings;
 
-export const ROM_REPOSITORY = "index.unikraft.io/unikraft/bb-sandbox";
+export const ROM_REPOSITORY = "index.unikraft.io/plugins/bb-sandbox";
 
 export function defaultSandboxRom(bbVersion: string): string {
   return `${ROM_REPOSITORY}:${bbVersion}`;

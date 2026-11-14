@@ -42,7 +42,7 @@ Settings → Plugins → Unikraft Cloud Sandbox, or
 | Organisation | from the token | The organisation console links point at. Managed mode reads it from the Unikraft Cloud token; set it by hand in external mode, or when the token names another organisation. |
 | Bastion URL | — | Filled in by managed mode; required in external mode. |
 | Bastion token | generated | Bearer token for the bastion's control API. Secret. |
-| Bastion image | `index.unikraft.io/unikraft/bb-bastion:latest` | |
+| Bastion image | `index.unikraft.io/plugins/bb-bastion:latest` | |
 | Bastion vCPUs / memory | 1 / 1024 MiB | |
 | Sandbox base image | `debian:latest` | Any image with a glibc dynamic loader and `/bin/sh`; `git`, `curl`, TLS roots and the Claude Code CLI come from the plugin ROM when the image lacks them, and the image's own copies win when present. |
 | Sandbox ROM | derived | Empty selects the ROM published for this bb version. |
