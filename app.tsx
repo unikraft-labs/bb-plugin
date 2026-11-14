@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type {
+  ExperimentalThreadContextSegmentInput,
+  ExperimentalThreadContextSegmentProps,
   PluginMachineProviderInputsProps,
-  PluginThreadHeaderActionProps,
 } from "@get-bb/plugin-sdk";
 import type {
   BastionStatus,
@@ -620,10 +621,13 @@ function SandboxServiceMenu({ links }: { links: SandboxServiceLink[] }) {
   );
 }
 
-function SandboxStatePill({
+function useSandboxVisible({
   threadId,
-  isCompactViewport,
-}: PluginThreadHeaderActionProps) {
+}: ExperimentalThreadContextSegmentInput): boolean {
+  return useSandbox(threadId).sandbox !== null;
+}
+
+function SandboxStatePill({ threadId }: ExperimentalThreadContextSegmentProps) {
   const { sandbox } = useSandbox(threadId);
 
   if (sandbox === null) return null;
@@ -643,7 +647,7 @@ function SandboxStatePill({
           )}
           aria-hidden
         />
-        {isCompactViewport ? null : sandbox.state}
+        {sandbox.state}
       </span>
       {links.length === 0 ? null : <SandboxServiceMenu links={links} />}
     </span>
@@ -701,9 +705,11 @@ export default definePluginApp((app) => {
     machineProviderId: MACHINE_PROVIDER_ID,
     component: SandboxOptions,
   });
-  app.slots.experimental_threadHeaderAction({
+  app.slots.experimental_threadContextSegment({
     id: "sandbox-state",
     title: "Unikraft Cloud sandbox",
-    component: SandboxStatePill,
+    group: "2_sandbox",
+    useVisible: useSandboxVisible,
+    summary: SandboxStatePill,
   });
 });
