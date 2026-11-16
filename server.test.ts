@@ -118,7 +118,7 @@ function externalSettings(url: string): Record<string, string> {
     mode: "external",
     bastionUrl: url,
     bastionToken: TOKEN,
-    sandboxRom: "index.unikraft.io/unikraft/bb-sandbox:0.43.1",
+    sandboxRom: "index.unikraft.io/plugins/bb-sandbox:0.43.1",
   };
 }
 

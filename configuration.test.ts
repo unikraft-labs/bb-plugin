@@ -14,7 +14,7 @@ function values(overrides: Partial<SettingValues> = {}): SettingValues {
     ukcOrg: undefined,
     bastionUrl: undefined,
     bastionToken: "bastion-token",
-    bastionImage: "index.unikraft.io/unikraft/bb-bastion:latest",
+    bastionImage: "index.unikraft.io/plugins/bb-bastion:latest",
     bastionVcpus: 1,
     bastionMemoryMb: 1024,
     sandboxImage: "debian:latest",
